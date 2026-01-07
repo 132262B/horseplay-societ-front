@@ -50,7 +50,7 @@ export const MotionConfig = {
   // 딴청(잠자기) 애니메이션
   stun: {
     targetRotationZ: Math.PI / 2, // 90도 옆으로 눕기
-    targetPositionY: -5, // 바닥에 눕기
+    targetPositionY: 6, // 바닥 위에 눕기
     rotationSpeed: 0.1, // 눕는 속도
     breathAmplitude: 0.3, // 숨쉬기 움직임
     breathSpeed: 0.5, // 숨쉬기 속도
@@ -59,18 +59,18 @@ export const MotionConfig = {
   // 서서 걸어가기 애니메이션 (사람처럼 직립 - 뒷발로 서기)
   walk: {
     targetRotationX: Math.PI / 3, // 앞으로 들어서 뒷발로 직립 (60도)
-    targetPositionY: 20, // 높이 올라감
+    targetPositionY: 16, // 높이 올라감
     rotationSpeed: 0.12,
     backLegSpeed: 3, // 뒷다리 걷기 속도
     backLegAmplitude: 0.4,
-    frontLegWave: 0.8, // 앞다리 흔들기
-    frontLegSpeed: 5,
+    frontLegWave: 0.3, // 앞다리 흔들기
+    frontLegSpeed: 2, // 앞다리 회전 속도
     headBob: 0.3, // 머리 까딱
   },
   // 넘어지기 애니메이션
   fallen: {
-    targetRotationX: Math.PI / 3, // 앞으로 고꾸라짐
-    targetPositionY: -8,
+    targetRotationX: 0, // 서있는 자세 유지
+    targetPositionY: -8, // 기본 높이
     rotationSpeed: 0.2,
   },
   // 가만히 서있기 애니메이션
@@ -100,8 +100,8 @@ export function updateRunningMotion(horse, time) {
   horse.legs[2].rotation.x = Math.sin(time * leg.speed + Math.PI) * leg.amplitude; // 앞다리 왼쪽
   horse.legs[3].rotation.x = Math.sin(time * leg.speed) * leg.amplitude; // 앞다리 오른쪽
 
-  // 몸 위아래 움직임
-  horse.mesh.position.y = Math.abs(Math.sin(time * body.bounceSpeed)) * body.bounceAmplitude;
+  // 몸 위아래 움직임 (기본 높이 + 바운스)
+  horse.mesh.position.y = 4 + Math.abs(Math.sin(time * body.bounceSpeed)) * body.bounceAmplitude;
 
   // 머리 위아래 흔들림 (달리는 느낌)
   horse.headGroup.rotation.x = Math.sin(time * head.nodSpeed) * head.nodAmplitude;
@@ -127,8 +127,8 @@ export function updateShockMotion(horse, time) {
   horse.mesh.rotation.x = Math.sin(time * shock.shakeSpeedX) * shock.shakeAmplitudeX;
   horse.mesh.rotation.z = Math.sin(time * shock.shakeSpeedZ) * shock.shakeAmplitudeZ;
 
-  // 파닥파닥
-  horse.mesh.position.y = Math.random() * shock.bounceMax;
+  // 파닥파닥 (기본 높이 + 랜덤 바운스)
+  horse.mesh.position.y = 4 + Math.random() * shock.bounceMax;
 }
 
 /**
@@ -191,9 +191,9 @@ export function updateWalkMotion(horse, time) {
   horse.legs[0].rotation.x = -0.8 + Math.sin(time * walk.backLegSpeed) * walk.backLegAmplitude;
   horse.legs[1].rotation.x = -0.8 + Math.sin(time * walk.backLegSpeed + Math.PI) * walk.backLegAmplitude;
 
-  // 앞다리(legs 2,3) 위로 들고 허우적
-  horse.legs[2].rotation.x = -1.5 + Math.sin(time * walk.frontLegSpeed) * walk.frontLegWave;
-  horse.legs[3].rotation.x = -1.5 + Math.sin(time * walk.frontLegSpeed + Math.PI) * walk.frontLegWave;
+  // 앞다리(legs 2,3) 360도 회전 (팔 휘두르기)
+  horse.legs[2].rotation.x = time * walk.frontLegSpeed;
+  horse.legs[3].rotation.x = time * walk.frontLegSpeed + Math.PI; // 반대 위상
 
   // 머리 위로 들고 까딱까딱
   horse.headGroup.rotation.x = -0.5 + Math.sin(time * 4) * walk.headBob;
@@ -209,31 +209,39 @@ export function updateWalkMotion(horse, time) {
 }
 
 /**
- * 넘어지기 모션 업데이트
+ * 넘어지기 모션 업데이트 (서있는 자세에서 다리만 벌림)
  * @param {Object} horse - 말 객체
  * @param {number} time - 현재 시간
  */
 export function updateFallenMotion(horse, time) {
-  const { fallen } = MotionConfig;
+  const { fallen, idle, tail, ear } = MotionConfig;
 
-  // 앞으로 고꾸라짐
-  const currentX = horse.mesh.rotation.x;
-  horse.mesh.rotation.x += (fallen.targetRotationX - currentX) * fallen.rotationSpeed;
+  // 서있는 자세 유지
+  horse.mesh.rotation.x += (fallen.targetRotationX - horse.mesh.rotation.x) * fallen.rotationSpeed;
+  horse.mesh.rotation.z += (0 - horse.mesh.rotation.z) * fallen.rotationSpeed;
 
-  // 바닥으로 내려감
-  const currentY = horse.mesh.position.y;
-  horse.mesh.position.y += (fallen.targetPositionY - currentY) * fallen.rotationSpeed;
+  // 기본 높이 유지 + 숨쉬기
+  const breathOffset = Math.sin(time * idle.breathSpeed) * idle.breathAmplitude;
+  horse.mesh.position.y = fallen.targetPositionY + breathOffset;
 
-  // 다리 앞으로 뻗기
-  horse.legs.forEach((leg, i) => {
-    leg.rotation.x += (0.8 - leg.rotation.x) * 0.15;
-  });
+  // 다리 벌리기 (J L 모양)
+  // 뒷다리 뒤로 뻗기
+  horse.legs[0].rotation.x += (-1.5 - horse.legs[0].rotation.x) * 0.15;
+  horse.legs[1].rotation.x += (-1.5 - horse.legs[1].rotation.x) * 0.15;
+  // 앞다리 앞으로 뻗기
+  horse.legs[2].rotation.x += (1.5 - horse.legs[2].rotation.x) * 0.15;
+  horse.legs[3].rotation.x += (1.5 - horse.legs[3].rotation.x) * 0.15;
 
-  // 머리 숙이기
-  horse.headGroup.rotation.x += (0.5 - horse.headGroup.rotation.x) * 0.1;
+  // 머리 아래로 떨구기
+  horse.headGroup.rotation.x += (0.8 - horse.headGroup.rotation.x) * 0.1;
 
   // 꼬리 늘어뜨리기
-  horse.tail.rotation.x += (1.2 - horse.tail.rotation.x) * 0.1;
+  horse.tail.rotation.x = tail.baseRotationX;
+  horse.tail.rotation.z = Math.sin(time * 0.5) * 0.1;
+
+  // 귀 살짝 접기
+  horse.earL.rotation.z = ear.baseRotationL - 0.2;
+  horse.earR.rotation.z = ear.baseRotationR + 0.2;
 }
 
 /**
@@ -244,9 +252,9 @@ export function updateFallenMotion(horse, time) {
 export function updateIdleMotion(horse, time) {
   const { idle, ear, tail } = MotionConfig;
 
-  // 숨쉬기 (몸통 미세하게 움직임)
+  // 숨쉬기 (몸통 미세하게 움직임) - 기본 높이 유지
   const breathOffset = Math.sin(time * idle.breathSpeed) * idle.breathAmplitude;
-  horse.mesh.position.y = breathOffset;
+  horse.mesh.position.y = 4 + breathOffset; // 기본 높이 4
 
   // 다리는 가만히
   horse.legs.forEach((leg) => {
@@ -284,8 +292,8 @@ export function updateBackMotion(horse, time) {
   horse.legs[2].rotation.x = Math.sin(time * leg.speed + Math.PI) * leg.amplitude * 0.7;
   horse.legs[3].rotation.x = Math.sin(time * leg.speed) * leg.amplitude * 0.7;
 
-  // 몸 위아래 움직임 (약간 줄임)
-  horse.mesh.position.y = Math.abs(Math.sin(time * body.bounceSpeed)) * body.bounceAmplitude * 0.7;
+  // 몸 위아래 움직임 (기본 높이 + 바운스)
+  horse.mesh.position.y = 4 + Math.abs(Math.sin(time * body.bounceSpeed)) * body.bounceAmplitude * 0.7;
 
   // 머리 흔들림
   horse.headGroup.rotation.x = Math.sin(time * head.nodSpeed) * head.nodAmplitude;

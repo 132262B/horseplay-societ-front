@@ -370,6 +370,11 @@
           currentMotion = btn.dataset.motion;
           document.getElementById('current-motion').textContent = currentMotion.toUpperCase();
           document.getElementById('motion-desc').textContent = motionDescriptions[currentMotion];
+
+          // 모션 초기화
+          if (horse) {
+            resetMotion(horse);
+          }
         });
       });
 
