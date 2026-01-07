@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SkillType, triggerRandomSkill, calculateSkillSpeed, applyShockPenalty } from './skills.js';
 import { updateMotion, resetMotion } from './motion.js';
 import { playThunder, playFirework, playCountSound } from './sound.js';
+import { initEffects, updateBoostEffects, emitBoostFlame } from './effects.js';
 
 let scene, camera, renderer, dirLight;
 let horses = [];
@@ -13,6 +14,8 @@ const PENALTY_THRESHOLD = 400;
 let frameCount = 0;
 let finishedCount = 0;
 let cameraMode = 0;
+let lastCameraChange = 0; // 마지막 카메라 변경 시점
+const CAMERA_COOLDOWN = 120; // 카메라 변경 쿨다운 (약 2초)
 
 const colors = [0xff6b6b, 0x4caf50, 0x5d5dff, 0xffa040, 0x8e5b4b, 0xcccccc, 0x00bcd4, 0x9c27b0];
 
@@ -325,6 +328,9 @@ function init() {
   scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x87ceeb, 800, 4000);
 
+  // 이펙트 시스템 초기화
+  initEffects(scene);
+
   camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
   camera.position.set(0, 50, 100);
 
@@ -564,6 +570,11 @@ class Horse3D {
     // 스킬에 따른 속도 계산 (모듈 사용)
     let currentSpeed = calculateSkillSpeed(this.status, this.speed);
 
+    // 부스트 중이면 불꽃 이펙트 발생
+    if (this.status === SkillType.BOOST && frameCount % 2 === 0) {
+      emitBoostFlame(this);
+    }
+
     this.mesh.position.z -= currentSpeed;
 
     // 랜덤 스킬 발동 (모듈 사용)
@@ -661,27 +672,43 @@ function updateSystem() {
     return;
   }
 
-  if (frameCount % 350 === 0) cameraMode = (cameraMode + 1) % 6;
+  // 카메라 모드 변경 (쿨다운 적용)
+  const timeSinceLastChange = frameCount - lastCameraChange;
+  if (frameCount % 350 === 0 && timeSinceLastChange >= CAMERA_COOLDOWN) {
+    cameraMode = (cameraMode + 1) % 6;
+    lastCameraChange = frameCount;
+  }
 
+  // 기본 카메라 위치 (현재 모드에 따라)
   let desiredPos;
-  if (leader.status === SkillType.SHOCK) {
-    desiredPos = new THREE.Vector3(targetPos.x + 30, 20, targetPos.z + 40);
-    camera.lookAt(targetPos);
-  } else {
-    if (cameraMode === 0) {
+  switch (cameraMode) {
+    case 0:
       desiredPos = new THREE.Vector3(0, 60, targetPos.z + 150);
       camera.lookAt(new THREE.Vector3(0, 10, targetPos.z - 50));
-    } else if (cameraMode === 1 || cameraMode === 4) {
+      break;
+    case 1:
+    case 4:
       desiredPos = new THREE.Vector3(0, 300, targetPos.z + 100);
       camera.lookAt(new THREE.Vector3(0, 0, targetPos.z));
-    } else if (cameraMode === 2 || cameraMode === 5) {
+      break;
+    case 2:
+    case 5:
       desiredPos = new THREE.Vector3(currentTrackWidth + 100, 60, targetPos.z);
       camera.lookAt(new THREE.Vector3(0, 10, targetPos.z));
-    } else if (cameraMode === 3) {
+      break;
+    case 3:
       desiredPos = new THREE.Vector3(targetPos.x + 40, 30, targetPos.z + 60);
       camera.lookAt(targetPos);
-    }
+      break;
   }
+
+  // 벼락 맞으면 가까이서 보여주기 (쿨다운 적용)
+  if (leader.status === SkillType.SHOCK && timeSinceLastChange >= CAMERA_COOLDOWN) {
+    desiredPos = new THREE.Vector3(targetPos.x + 30, 20, targetPos.z + 40);
+    camera.lookAt(targetPos);
+    lastCameraChange = frameCount;
+  }
+
   camera.position.lerp(desiredPos, 0.04);
 }
 
@@ -706,6 +733,7 @@ function animate() {
 
   updateClouds();
   updateFireworks();
+  updateBoostEffects();
 
   if (isRacing) {
     horses.forEach((h) => h.update());
