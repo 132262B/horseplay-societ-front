@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { SkillType, triggerRandomSkill, calculateSkillSpeed, applyShockPenalty } from './skills.js';
+import { updateMotion, resetMotion } from './motion.js';
+import { playThunder, playFirework, playCountSound } from './sound.js';
 
 let scene, camera, renderer, dirLight;
 let horses = [];
@@ -12,72 +15,6 @@ let finishedCount = 0;
 let cameraMode = 0;
 
 const colors = [0xff6b6b, 0x4caf50, 0x5d5dff, 0xffa040, 0x8e5b4b, 0xcccccc, 0x00bcd4, 0x9c27b0];
-
-// --- 사운드 ---
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-function playTone(freq, type, dur, vol = 0.1) {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = type;
-  osc.frequency.value = freq;
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  gain.gain.value = vol;
-  osc.start();
-  gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + dur);
-  osc.stop(audioCtx.currentTime + dur);
-}
-function playThunder() {
-  playTone(100, 'sawtooth', 0.5, 0.5);
-  playTone(50, 'square', 0.8, 0.5);
-}
-
-// --- 폭죽 소리 ---
-function playFirework() {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-
-  // 발사 소리 (휘이이잉)
-  const launchOsc = audioCtx.createOscillator();
-  const launchGain = audioCtx.createGain();
-  launchOsc.type = 'sawtooth';
-  launchOsc.frequency.setValueAtTime(200, audioCtx.currentTime);
-  launchOsc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.3);
-  launchOsc.connect(launchGain);
-  launchGain.connect(audioCtx.destination);
-  launchGain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-  launchGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-  launchOsc.start();
-  launchOsc.stop(audioCtx.currentTime + 0.3);
-
-  // 폭발 소리 (빵!)
-  setTimeout(() => {
-    // 노이즈 생성
-    const bufferSize = audioCtx.sampleRate * 0.3;
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.1));
-    }
-    const noise = audioCtx.createBufferSource();
-    noise.buffer = buffer;
-
-    const noiseGain = audioCtx.createGain();
-    noiseGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-    noiseGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-
-    noise.connect(noiseGain);
-    noiseGain.connect(audioCtx.destination);
-    noise.start();
-
-    // 반짝이 소리 (찌지직)
-    for (let j = 0; j < 5; j++) {
-      setTimeout(() => {
-        playTone(1000 + Math.random() * 2000, 'sine', 0.1, 0.1);
-      }, j * 50);
-    }
-  }, 300);
-}
 
 // --- 폭죽 파티클 ---
 let fireworkParticles = [];
@@ -98,7 +35,6 @@ function createFirework(position) {
     particle.position.copy(position);
     particle.position.y += 50;
 
-    // 랜덤 방향으로 퍼지는 속도
     const angle = Math.random() * Math.PI * 2;
     const angle2 = Math.random() * Math.PI;
     const speed = 2 + Math.random() * 3;
@@ -121,16 +57,13 @@ function updateFireworks() {
   for (let i = fireworkParticles.length - 1; i >= 0; i--) {
     const p = fireworkParticles[i];
 
-    // 위치 업데이트
     p.position.add(p.userData.velocity);
-    p.userData.velocity.y -= 0.08; // 중력
-    p.userData.velocity.multiplyScalar(0.98); // 공기저항
+    p.userData.velocity.y -= 0.08;
+    p.userData.velocity.multiplyScalar(0.98);
 
-    // 수명 감소
     p.userData.life -= p.userData.decay;
     p.material.opacity = p.userData.life;
 
-    // 수명 다하면 제거
     if (p.userData.life <= 0) {
       scene.remove(p);
       p.geometry.dispose();
@@ -140,12 +73,8 @@ function updateFireworks() {
   }
 }
 
-// 연속 폭죽 (1등 축하)
 function celebrateWinner(position) {
-  // 첫 폭죽
   createFirework(position);
-
-  // 추가 폭죽들 (시간차)
   setTimeout(() => createFirework(new THREE.Vector3(position.x - 50, 0, position.z)), 300);
   setTimeout(() => createFirework(new THREE.Vector3(position.x + 50, 0, position.z)), 500);
   setTimeout(() => createFirework(new THREE.Vector3(position.x, 0, position.z - 30)), 700);
@@ -155,18 +84,16 @@ function celebrateWinner(position) {
 // --- 구름 배열 ---
 let clouds = [];
 
-// --- 하늘 배경 생성 ---
 function createSky() {
-  // 그라데이션 하늘 (위: 진한 파랑, 아래: 하늘색)
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
   const gradient = ctx.createLinearGradient(0, 0, 0, 512);
-  gradient.addColorStop(0, '#1e3c72'); // 진한 파랑 (위)
-  gradient.addColorStop(0.3, '#2a5298'); // 중간 파랑
-  gradient.addColorStop(0.6, '#87ceeb'); // 하늘색
-  gradient.addColorStop(1, '#b0e0e6'); // 연한 하늘색 (아래/수평선)
+  gradient.addColorStop(0, '#1e3c72');
+  gradient.addColorStop(0.3, '#2a5298');
+  gradient.addColorStop(0.6, '#87ceeb');
+  gradient.addColorStop(1, '#b0e0e6');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, 512, 512);
 
@@ -174,15 +101,13 @@ function createSky() {
   scene.background = skyTexture;
 }
 
-// --- 구름 생성 ---
 function createClouds() {
   const cloudGroup = new THREE.Group();
 
   for (let i = 0; i < 30; i++) {
     const cloud = new THREE.Group();
-
-    // 구름은 여러 개의 구체로 구성
     const puffCount = 3 + Math.floor(Math.random() * 4);
+
     for (let j = 0; j < puffCount; j++) {
       const puffGeo = new THREE.SphereGeometry(20 + Math.random() * 30, 8, 6);
       const puffMat = new THREE.MeshBasicMaterial({
@@ -192,11 +117,10 @@ function createClouds() {
       });
       const puff = new THREE.Mesh(puffGeo, puffMat);
       puff.position.set(j * 25 - puffCount * 12, Math.random() * 10 - 5, Math.random() * 15 - 7);
-      puff.scale.y = 0.6; // 구름을 납작하게
+      puff.scale.y = 0.6;
       cloud.add(puff);
     }
 
-    // 구름 위치 (넓게 분포)
     cloud.position.set(Math.random() * 2000 - 1000, 150 + Math.random() * 200, Math.random() * -4500);
     cloud.userData.speed = 0.1 + Math.random() * 0.2;
 
@@ -207,7 +131,6 @@ function createClouds() {
   scene.add(cloudGroup);
 }
 
-// --- 구름 애니메이션 ---
 function updateClouds() {
   clouds.forEach((cloud) => {
     cloud.position.x += cloud.userData.speed;
@@ -218,15 +141,13 @@ function updateClouds() {
 }
 
 // --- 트랙 설정 ---
-const LANE_WIDTH = 30; // 레인 하나의 너비
+const LANE_WIDTH = 30;
 const MIN_LANES = 8;
 const MAX_LANES = 20;
 let currentTrackWidth = LANE_WIDTH * MIN_LANES;
-let trackObjects = []; // 동적 트랙 오브젝트들
+let trackObjects = [];
 
-// --- 기본 바닥 생성 ---
 function createGround() {
-  // 잔디 (전체 바닥)
   const grassGeo = new THREE.PlaneGeometry(2000, 10000);
   const grassMat = new THREE.MeshStandardMaterial({ color: 0x228b22 });
   const grass = new THREE.Mesh(grassGeo, grassMat);
@@ -236,9 +157,7 @@ function createGround() {
   scene.add(grass);
 }
 
-// --- 동적 트랙 생성 ---
 function createTrack(laneCount) {
-  // 기존 트랙 오브젝트 제거
   trackObjects.forEach((obj) => {
     scene.remove(obj);
     if (obj.geometry) obj.geometry.dispose();
@@ -246,11 +165,9 @@ function createTrack(laneCount) {
   });
   trackObjects = [];
 
-  // 레인 수 계산 (최소 8, 최대 20)
   const lanes = Math.max(MIN_LANES, Math.min(MAX_LANES, laneCount));
   currentTrackWidth = LANE_WIDTH * lanes;
 
-  // 흙 트랙 (경주로)
   const trackGeo = new THREE.PlaneGeometry(currentTrackWidth, 10000);
   const trackMat = new THREE.MeshStandardMaterial({ color: 0xc2956e });
   const track = new THREE.Mesh(trackGeo, trackMat);
@@ -260,11 +177,9 @@ function createTrack(laneCount) {
   scene.add(track);
   trackObjects.push(track);
 
-  // 트랙 라인 (레인 구분선)
   const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const lineGeo = new THREE.PlaneGeometry(2, 10000);
 
-  // 레인 구분선 (레인 수 - 1 개)
   for (let i = 1; i < lanes; i++) {
     const line = new THREE.Mesh(lineGeo.clone(), lineMat.clone());
     line.rotation.x = -Math.PI / 2;
@@ -273,7 +188,6 @@ function createTrack(laneCount) {
     trackObjects.push(line);
   }
 
-  // 트랙 경계선 (양쪽 굵은 선)
   const borderGeo = new THREE.PlaneGeometry(5, 10000);
   const borderMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
 
@@ -289,7 +203,6 @@ function createTrack(laneCount) {
   scene.add(rightBorder);
   trackObjects.push(rightBorder);
 
-  // 펜스 (양쪽)
   const fencePostGeo = new THREE.BoxGeometry(3, 20, 3);
   const fencePostMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
   const fenceRailGeo = new THREE.BoxGeometry(2, 3, 100);
@@ -321,7 +234,6 @@ function createTrack(laneCount) {
     }
   }
 
-  // 거리 표시판 (매 500m)
   for (let dist = 500; dist <= 3500; dist += 500) {
     const markerCanvas = document.createElement('canvas');
     markerCanvas.width = 128;
@@ -352,12 +264,9 @@ function createTrack(laneCount) {
   }
 }
 
-// --- 결승선 오브젝트 ---
 let finishLineObjects = [];
 
-// --- 결승선 생성 ---
 function createFinishLine() {
-  // 기존 결승선 제거
   finishLineObjects.forEach((obj) => {
     scene.remove(obj);
     if (obj.geometry) obj.geometry.dispose();
@@ -365,7 +274,6 @@ function createFinishLine() {
   });
   finishLineObjects = [];
 
-  // 결승선 바닥
   const finishLineGeo = new THREE.BoxGeometry(currentTrackWidth + 20, 10, 15);
   const finishLineMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
   const finishLine = new THREE.Mesh(finishLineGeo, finishLineMat);
@@ -373,7 +281,6 @@ function createFinishLine() {
   scene.add(finishLine);
   finishLineObjects.push(finishLine);
 
-  // 결승 게이트
   const gatePostGeo = new THREE.BoxGeometry(10, 80, 10);
   const gatePostMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
 
@@ -395,7 +302,6 @@ function createFinishLine() {
   scene.add(gateTop);
   finishLineObjects.push(gateTop);
 
-  // FINISH 텍스트
   const finishCanvas = document.createElement('canvas');
   finishCanvas.width = 512;
   finishCanvas.height = 128;
@@ -415,10 +321,9 @@ function createFinishLine() {
   finishLineObjects.push(finishSign);
 }
 
-// --- 초기화 ---
 function init() {
   scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x87ceeb, 800, 4000); // 하늘색 안개
+  scene.fog = new THREE.Fog(0x87ceeb, 800, 4000);
 
   camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
   camera.position.set(0, 50, 100);
@@ -428,26 +333,16 @@ function init() {
   renderer.shadowMap.enabled = true;
   document.body.appendChild(renderer.domElement);
 
-  // 하늘 생성
   createSky();
-
-  // 구름 생성
   createClouds();
-
-  // 기본 바닥 생성
   createGround();
-
-  // 기본 8레인 트랙 생성
   createTrack(MIN_LANES);
-
-  // 결승선 생성
   createFinishLine();
 
-  // 조명
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambientLight);
 
-  dirLight = new THREE.DirectionalLight(0xfffacd, 1.2); // 따뜻한 햇빛
+  dirLight = new THREE.DirectionalLight(0xfffacd, 1.2);
   dirLight.position.set(100, 200, 100);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.width = 2048;
@@ -458,7 +353,6 @@ function init() {
   dirLight.shadow.camera.bottom = -300;
   scene.add(dirLight);
 
-  // 태양 (시각적)
   const sunGeo = new THREE.SphereGeometry(50, 16, 16);
   const sunMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
   const sun = new THREE.Mesh(sunGeo, sunMat);
@@ -469,7 +363,7 @@ function init() {
   animate();
 }
 
-// --- 말 클래스 (디자인 개선) ---
+// --- 말 클래스 ---
 class Horse3D {
   constructor(name, index, total) {
     this.name = name;
@@ -482,27 +376,25 @@ class Horse3D {
     const blackMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
     const hoofMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
 
-    // === 몸통 (타원형) ===
+    // 몸통
     const bodyGeo = new THREE.CapsuleGeometry(6, 18, 8, 16);
     this.body = new THREE.Mesh(bodyGeo, this.bodyMat);
-    this.body.rotation.x = Math.PI / 2; // 앞뒤로 눕힘 (달리는 방향)
+    this.body.rotation.x = Math.PI / 2;
     this.body.position.set(0, 15, 0);
     this.body.castShadow = true;
     this.mesh.add(this.body);
 
-    // === 목+머리 그룹 ===
+    // 목+머리 그룹
     this.headGroup = new THREE.Group();
     this.headGroup.position.set(0, 18, -12);
 
-    // 목 (기울어진 원기둥)
     const neckGeo = new THREE.CylinderGeometry(3, 4, 14, 8);
     this.neck = new THREE.Mesh(neckGeo, this.bodyMat);
     this.neck.position.set(0, 5, -3);
-    this.neck.rotation.x = -0.6; // 앞으로 기울임
+    this.neck.rotation.x = -0.6;
     this.neck.castShadow = true;
     this.headGroup.add(this.neck);
 
-    // 머리 (길쭉한 박스)
     const headGeo = new THREE.BoxGeometry(5, 6, 14);
     this.head = new THREE.Mesh(headGeo, this.headMat);
     this.head.position.set(0, 12, -10);
@@ -510,13 +402,11 @@ class Horse3D {
     this.head.castShadow = true;
     this.headGroup.add(this.head);
 
-    // 코/주둥이 (앞으로 튀어나온 부분)
     const snoutGeo = new THREE.BoxGeometry(4, 4, 5);
     const snout = new THREE.Mesh(snoutGeo, this.headMat);
     snout.position.set(0, -1, -8);
     this.head.add(snout);
 
-    // 콧구멍
     const nostrilGeo = new THREE.SphereGeometry(0.5, 6, 6);
     const nostrilL = new THREE.Mesh(nostrilGeo, blackMat);
     nostrilL.position.set(-1, -1, -2.5);
@@ -525,7 +415,6 @@ class Horse3D {
     nostrilR.position.set(1, -1, -2.5);
     snout.add(nostrilR);
 
-    // 눈 (양쪽)
     const eyeGeo = new THREE.SphereGeometry(1, 8, 8);
     const eyeL = new THREE.Mesh(eyeGeo, whiteMat);
     eyeL.position.set(-2.5, 1, -2);
@@ -534,7 +423,6 @@ class Horse3D {
     eyeR.position.set(2.5, 1, -2);
     this.head.add(eyeR);
 
-    // 눈동자
     const pupilGeo = new THREE.SphereGeometry(0.5, 6, 6);
     const pupilL = new THREE.Mesh(pupilGeo, blackMat);
     pupilL.position.set(-0.3, 0, -0.7);
@@ -543,7 +431,6 @@ class Horse3D {
     pupilR.position.set(0.3, 0, -0.7);
     eyeR.add(pupilR);
 
-    // 귀 (삼각뿔)
     const earGeo = new THREE.ConeGeometry(1.5, 5, 4);
     this.earL = new THREE.Mesh(earGeo, this.bodyMat);
     this.earL.position.set(-2, 5, 0);
@@ -557,7 +444,6 @@ class Horse3D {
     this.earR.rotation.x = -0.2;
     this.head.add(this.earR);
 
-    // 갈기 (목 위에 여러 개)
     const maneGeo = new THREE.BoxGeometry(1, 4, 2);
     for (let i = 0; i < 5; i++) {
       const mane = new THREE.Mesh(maneGeo, blackMat);
@@ -568,7 +454,7 @@ class Horse3D {
 
     this.mesh.add(this.headGroup);
 
-    // === 꼬리 ===
+    // 꼬리
     const tailGeo = new THREE.CylinderGeometry(0.5, 1.5, 12, 6);
     this.tail = new THREE.Mesh(tailGeo, blackMat);
     this.tail.position.set(0, 16, 14);
@@ -576,34 +462,31 @@ class Horse3D {
     this.tail.castShadow = true;
     this.mesh.add(this.tail);
 
-    // === 다리 (4개, 관절 있음) ===
+    // 다리
     this.legs = [];
     const legPositions = [
-      { x: -4, z: 7 }, // 뒷다리 왼쪽
-      { x: 4, z: 7 }, // 뒷다리 오른쪽
-      { x: -4, z: -7 }, // 앞다리 왼쪽
-      { x: 4, z: -7 }, // 앞다리 오른쪽
+      { x: -4, z: 7 },
+      { x: 4, z: 7 },
+      { x: -4, z: -7 },
+      { x: 4, z: -7 },
     ];
 
     legPositions.forEach((pos) => {
       const legGroup = new THREE.Group();
       legGroup.position.set(pos.x, 10, pos.z);
 
-      // 허벅지
       const thighGeo = new THREE.CylinderGeometry(2, 1.5, 8, 6);
       const thigh = new THREE.Mesh(thighGeo, this.bodyMat);
       thigh.position.y = -2;
       thigh.castShadow = true;
       legGroup.add(thigh);
 
-      // 종아리
       const calfGeo = new THREE.CylinderGeometry(1.5, 1, 7, 6);
       const calf = new THREE.Mesh(calfGeo, this.bodyMat);
       calf.position.y = -9;
       calf.castShadow = true;
       legGroup.add(calf);
 
-      // 발굽
       const hoofGeo = new THREE.CylinderGeometry(1.2, 1.5, 2, 6);
       const hoof = new THREE.Mesh(hoofGeo, hoofMat);
       hoof.position.y = -13.5;
@@ -614,7 +497,7 @@ class Horse3D {
       this.legs.push(legGroup);
     });
 
-    // === 이름표 (빌보드) ===
+    // 이름표
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     canvas.width = 256;
@@ -636,56 +519,29 @@ class Horse3D {
     this.label.scale.set(28, 7, 1);
     scene.add(this.label);
 
-    // === 배치 ===
+    // 배치
     const laneWidth = currentTrackWidth / total;
     this.mesh.position.x = index * laneWidth - currentTrackWidth / 2 + laneWidth / 2;
     this.mesh.position.z = 0;
 
     scene.add(this.mesh);
 
-    this.baseSpeed = Math.random() * 0.15 + 0.75; // 0.75 ~ 0.9 (범위 축소)
+    this.baseSpeed = Math.random() * 0.15 + 0.75;
     this.speed = this.baseSpeed;
     this.finished = false;
-    this.status = 'run';
+    this.status = SkillType.RUN;
     this.statusTimer = 0;
     this.wobbleOffset = Math.random() * 100;
-    this.rank = 0; // 현재 순위
+    this.rank = 0;
   }
 
   update() {
-    // 이름표 위치 업데이트 (항상 - 골인 후에도)
     this.label.position.set(this.mesh.position.x, this.mesh.position.y + 40, this.mesh.position.z);
 
     if (this.finished) return;
 
-    // 애니메이션
-    const time = Date.now() * 0.015 + this.wobbleOffset;
-    if (this.status !== 'shock') {
-      // 다리 애니메이션 (뒷다리와 앞다리가 교차)
-      this.legs[0].rotation.x = Math.sin(time) * 0.6; // 뒷다리 왼쪽
-      this.legs[1].rotation.x = Math.sin(time + Math.PI) * 0.6; // 뒷다리 오른쪽
-      this.legs[2].rotation.x = Math.sin(time + Math.PI) * 0.6; // 앞다리 왼쪽
-      this.legs[3].rotation.x = Math.sin(time) * 0.6; // 앞다리 오른쪽
-
-      // 몸 위아래 움직임
-      this.mesh.position.y = Math.abs(Math.sin(time * 2)) * 2;
-
-      // 머리 위아래 흔들림 (달리는 느낌)
-      this.headGroup.rotation.x = Math.sin(time * 2) * 0.15;
-
-      // 꼬리 좌우 흔들림
-      this.tail.rotation.z = Math.sin(time * 3) * 0.4;
-      this.tail.rotation.x = 0.8 + Math.sin(time * 2) * 0.2;
-
-      // 귀 팔랑거림
-      this.earL.rotation.z = -0.3 + Math.sin(time * 4) * 0.1;
-      this.earR.rotation.z = 0.3 + Math.sin(time * 4 + 1) * 0.1;
-    } else {
-      // 벼락 맞았을 때
-      this.mesh.rotation.x = Math.sin(time * 8) * 0.15; // 빠른 경련
-      this.mesh.rotation.z = Math.sin(time * 6) * 0.1;
-      this.mesh.position.y = Math.random() * 3; // 파닥파닥
-    }
+    // 모션 업데이트 (모듈 사용)
+    updateMotion(this, this.status, this.wobbleOffset);
 
     // 상태이상 해제
     if (this.statusTimer > 0) {
@@ -693,32 +549,30 @@ class Horse3D {
       if (this.statusTimer <= 0) this.resetStatus();
     }
 
-    // 러버밴딩 (순위에 따른 속도 조절)
-    // 뒤처질수록 빨라지고, 앞서갈수록 느려짐
+    // 러버밴딩
     const totalHorses = horses.filter((h) => !h.finished).length;
     if (totalHorses > 1 && this.rank > 0) {
-      const rankRatio = (this.rank - 1) / (totalHorses - 1); // 0(1등) ~ 1(꼴등)
-      // 꼴등은 +30% 보너스, 1등은 -10% 패널티
+      const rankRatio = (this.rank - 1) / (totalHorses - 1);
       const rubberBand = 0.9 + rankRatio * 0.4;
       this.speed = this.baseSpeed * rubberBand;
     }
 
-    // 랜덤 속도 변동 (가끔씩)
     if (Math.random() < 0.02) {
       this.speed = this.baseSpeed * (0.8 + Math.random() * 0.5);
     }
 
-    // 이동
-    let currentSpeed = this.speed;
-    if (this.status === 'boost') currentSpeed *= 2.5;
-    if (this.status === 'stun' || this.status === 'shock') currentSpeed = 0;
-    if (this.status === 'back') currentSpeed = -0.8;
+    // 스킬에 따른 속도 계산 (모듈 사용)
+    let currentSpeed = calculateSkillSpeed(this.status, this.speed);
 
     this.mesh.position.z -= currentSpeed;
 
-    // 랜덤 스킬
-    if (this.status === 'run' && Math.random() < 0.0015) {
-      this.triggerRandomSkill();
+    // 랜덤 스킬 발동 (모듈 사용)
+    if (this.status === SkillType.RUN && Math.random() < 0.0015) {
+      const result = triggerRandomSkill(this.name, addLog);
+      if (result) {
+        this.status = result.skill;
+        this.statusTimer = result.duration;
+      }
     }
 
     if (this.mesh.position.z <= finishLineZ) {
@@ -727,13 +581,11 @@ class Horse3D {
       addLog(`🏁 ${this.name} 골인!!!`);
       addToRank(this.name);
 
-      // 1등이면 폭죽!
       if (finishedCount === 1) {
         celebrateWinner(this.mesh.position.clone());
         addLog(`🎉🎉🎉 ${this.name} 우승!!! 🎉🎉🎉`);
       }
 
-      // 2명 골인하면 경기 종료
       if (finishedCount >= 2) {
         isRacing = false;
         setTimeout(() => {
@@ -745,52 +597,34 @@ class Horse3D {
   }
 
   applyPenalty() {
-    this.status = 'shock';
-    this.statusTimer = 300; // 5초 동안 기절
-    this.bodyMat.color.setHex(0x000000); // 완전 검정으로 타버린 색
-    this.headMat.color.setHex(0x333333); // 머리도 어둡게
+    // 패널티 적용 (모듈 사용)
+    const result = applyShockPenalty(this.name, addLog);
+    this.status = result.skill;
+    this.statusTimer = result.duration;
+
+    this.bodyMat.color.setHex(0x000000);
+    this.headMat.color.setHex(0x333333);
 
     const flash = document.getElementById('flash-overlay');
     flash.style.opacity = 1;
     setTimeout(() => (flash.style.opacity = 0), 100);
 
     playThunder();
-    addLog(`⚡ 쾅!!! ${this.name} 선수, 독주하다 벼락 맞았습니다!!`);
-  }
-
-  triggerRandomSkill() {
-    const r = Math.random();
-    if (r < 0.3) {
-      this.status = 'boost';
-      this.statusTimer = 100;
-      addLog(`🚀 ${this.name}: 스퍼트 올립니다!`);
-    } else if (r < 0.5) {
-      this.status = 'stun';
-      this.statusTimer = 100;
-      addLog(`💤 ${this.name}: 잠시 딴청 피웁니다.`);
-    } else if (r < 0.7) {
-      this.status = 'back';
-      this.statusTimer = 80;
-      addLog(`🔙 ${this.name}: 뒤로 갑니다?!`);
-    }
   }
 
   resetStatus() {
-    this.status = 'run';
-    this.bodyMat.color.setHex(this.originalColor); // 색상 복구
-    this.headMat.color.setHex(this.originalColor); // 머리 색상도 복구
-    this.mesh.rotation.set(0, 0, 0);
+    this.status = SkillType.RUN;
+    this.bodyMat.color.setHex(this.originalColor);
+    this.headMat.color.setHex(this.originalColor);
+    resetMotion(this);
   }
 }
 
-// --- 시스템 업데이트 ---
 function updateSystem() {
   if (!isRacing || horses.length === 0) return;
 
-  // 순위 계산 (골인하지 않은 말들만)
   let sorted = [...horses].filter((h) => !h.finished).sort((a, b) => a.mesh.position.z - b.mesh.position.z);
 
-  // 각 말의 순위 업데이트
   sorted.forEach((horse, index) => {
     horse.rank = index + 1;
   });
@@ -798,7 +632,7 @@ function updateSystem() {
   let leader = sorted[0];
   let second = sorted[1];
 
-  if (!leader) return; // 모두 골인한 경우
+  if (!leader) return;
 
   let dist = Math.floor(Math.abs(finishLineZ - leader.mesh.position.z));
   if (leader.mesh.position.z <= finishLineZ) dist = 0;
@@ -807,10 +641,9 @@ function updateSystem() {
   if (second && !leader.finished) {
     let gap = Math.abs(second.mesh.position.z - leader.mesh.position.z);
     document.getElementById('gapLabel').innerText = `2등과의 격차: ${Math.floor(gap)}m`;
-
     document.getElementById('gapLabel').style.color = gap > 300 ? '#ff4757' : 'white';
 
-    if (gap > PENALTY_THRESHOLD && leader.status === 'run') {
+    if (gap > PENALTY_THRESHOLD && leader.status === SkillType.RUN) {
       leader.applyPenalty();
     }
   }
@@ -821,39 +654,30 @@ function updateSystem() {
 
   const targetPos = leader.mesh.position.clone();
 
-  // 500m 이내면 결승선 사이드 뷰로 고정
   if (dist <= 500 && dist > 0) {
-    // 오른쪽에서 결승선 전체를 바라보는 뷰
     const desiredPos = new THREE.Vector3(400, 80, finishLineZ + 50);
     camera.position.lerp(desiredPos, 0.03);
     camera.lookAt(new THREE.Vector3(0, 20, finishLineZ));
     return;
   }
 
-  // 카메라 모드 순서 (전체 뷰 비중 높임)
-  // 0: 전체 뒤따라가기, 1: 전체 탑뷰, 2: 전체 사이드, 3: 선두 트래킹, 4: 전체 탑뷰, 5: 전체 사이드
   if (frameCount % 350 === 0) cameraMode = (cameraMode + 1) % 6;
 
   let desiredPos;
-  if (leader.status === 'shock') {
-    // 벼락 맞으면 가까이서 보여주기
+  if (leader.status === SkillType.SHOCK) {
     desiredPos = new THREE.Vector3(targetPos.x + 30, 20, targetPos.z + 40);
     camera.lookAt(targetPos);
   } else {
     if (cameraMode === 0) {
-      // 전체 뒤따라가기 (모든 말이 보이는 뒤쪽 뷰)
       desiredPos = new THREE.Vector3(0, 60, targetPos.z + 150);
       camera.lookAt(new THREE.Vector3(0, 10, targetPos.z - 50));
     } else if (cameraMode === 1 || cameraMode === 4) {
-      // 전체 탑뷰
       desiredPos = new THREE.Vector3(0, 300, targetPos.z + 100);
       camera.lookAt(new THREE.Vector3(0, 0, targetPos.z));
     } else if (cameraMode === 2 || cameraMode === 5) {
-      // 전체 사이드뷰
       desiredPos = new THREE.Vector3(currentTrackWidth + 100, 60, targetPos.z);
       camera.lookAt(new THREE.Vector3(0, 10, targetPos.z));
     } else if (cameraMode === 3) {
-      // 선두 트래킹 (가끔 개인뷰)
       desiredPos = new THREE.Vector3(targetPos.x + 40, 30, targetPos.z + 60);
       camera.lookAt(targetPos);
     }
@@ -880,10 +704,7 @@ function animate() {
   requestAnimationFrame(animate);
   frameCount++;
 
-  // 구름 항상 움직임
   updateClouds();
-
-  // 폭죽 항상 업데이트
   updateFireworks();
 
   if (isRacing) {
@@ -899,7 +720,6 @@ function onWindowResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// --- 카운트다운 ---
 function startCountdown(callback) {
   const countdownEl = document.getElementById('countdown');
   const counts = ['3', '2', '1', 'GO!'];
@@ -911,15 +731,11 @@ function startCountdown(callback) {
     if (index < counts.length) {
       countdownEl.textContent = counts[index];
       countdownEl.style.animation = 'none';
-      countdownEl.offsetHeight; // reflow
+      countdownEl.offsetHeight;
       countdownEl.style.animation = 'countPulse 0.5s ease-out';
 
-      // 카운트 소리
-      if (index < 3) {
-        playTone(400, 'square', 0.2, 0.3);
-      } else {
-        playTone(800, 'square', 0.4, 0.4);
-      }
+      // 사운드 모듈 사용
+      playCountSound(index >= 3);
 
       index++;
       setTimeout(showNext, 800);
@@ -950,14 +766,11 @@ document.getElementById('startBtn').addEventListener('click', () => {
 
   document.getElementById('setup-box').style.display = 'none';
 
-  // 말 수에 맞게 트랙 다시 생성
   createTrack(names.length);
   createFinishLine();
 
-  // 말들 생성
   names.forEach((name, i) => horses.push(new Horse3D(name, i, names.length)));
 
-  // 카운트다운 후 시작
   startCountdown(() => {
     document.getElementById('broadcast').style.display = 'block';
     isRacing = true;
