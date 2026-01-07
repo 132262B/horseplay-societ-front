@@ -796,6 +796,47 @@ function createTrack(laneCount) {
 }
 
 let finishLineObjects = [];
+let startLineObjects = [];
+
+function createStartLine() {
+  startLineObjects.forEach((obj) => {
+    scene.remove(obj);
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) obj.material.dispose();
+  });
+  startLineObjects = [];
+
+  const startLineZ = 0;
+
+  // 체크 무늬 텍스처 생성
+  const checkCanvas = document.createElement('canvas');
+  checkCanvas.width = 128;
+  checkCanvas.height = 32;
+  const ctx = checkCanvas.getContext('2d');
+  const squareSize = 16;
+
+  for (let x = 0; x < checkCanvas.width; x += squareSize) {
+    for (let y = 0; y < checkCanvas.height; y += squareSize) {
+      const isWhite = ((x / squareSize) + (y / squareSize)) % 2 === 0;
+      ctx.fillStyle = isWhite ? '#ffffff' : '#000000';
+      ctx.fillRect(x, y, squareSize, squareSize);
+    }
+  }
+
+  const checkTexture = new THREE.CanvasTexture(checkCanvas);
+  checkTexture.wrapS = THREE.RepeatWrapping;
+  checkTexture.wrapT = THREE.RepeatWrapping;
+  checkTexture.repeat.set(currentTrackWidth / 30, 1);
+
+  // 출발선 바닥 (체크 무늬)
+  const startLineGeo = new THREE.PlaneGeometry(currentTrackWidth + 20, 10);
+  const startLineMat = new THREE.MeshBasicMaterial({ map: checkTexture });
+  const startLine = new THREE.Mesh(startLineGeo, startLineMat);
+  startLine.rotation.x = -Math.PI / 2;
+  startLine.position.set(0, 1, startLineZ); // 흰색 선보다 살짝 높게
+  scene.add(startLine);
+  startLineObjects.push(startLine);
+}
 
 function createFinishLine() {
   finishLineObjects.forEach((obj) => {
@@ -1056,6 +1097,7 @@ class Horse3D {
     // 배치
     const laneWidth = currentTrackWidth / total;
     this.mesh.position.x = index * laneWidth - currentTrackWidth / 2 + laneWidth / 2;
+    this.mesh.position.y = 4; // 기본 높이
     this.mesh.position.z = 0;
 
     scene.add(this.mesh);
@@ -1458,6 +1500,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
 
   createTrack(names.length);
   createFinishLine();
+  createStartLine();
 
   names.forEach((name, i) => horses.push(new Horse3D(name, i, names.length)));
 

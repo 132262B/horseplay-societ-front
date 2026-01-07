@@ -27,8 +27,8 @@ export const SkillConfig = {
     message: (name) => `💤 ${name}: 잠시 딴청 피웁니다.`,
   },
   [SkillType.BACK]: {
-    duration: 80,
-    speedMultiplier: -0.8,
+    duration: 120, // 2초
+    speedMultiplier: -0.2, // 20% 속도로 뒤로 이동
     message: (name) => `🔙 ${name}: 뒤로 갑니다?!`,
   },
   [SkillType.SHOCK]: {
@@ -42,7 +42,7 @@ export const SkillConfig = {
     message: (name) => `🚶 ${name}: 위협의 행진! 좌우를 밀어붙입니다!`,
   },
   [SkillType.FALLEN]: {
-    duration: 60, // 1초
+    duration: 120, // 2초
     speedMultiplier: 0,
     message: (name) => `💥 ${name}: 넘어졌습니다!`,
   },
