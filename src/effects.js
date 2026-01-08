@@ -18,11 +18,13 @@ export function initEffects(sceneRef) {
 /**
  * 불꽃 파티클 생성
  * @param {THREE.Vector3} position - 생성 위치
+ * @param {boolean} isReversed - 말이 반전 상태인지 여부
  */
-export function createBoostFlame(position) {
+export function createBoostFlame(position, isReversed = false) {
   if (!scene) return;
 
   const flameColors = [0xff4500, 0xff6600, 0xff8c00, 0xffaa00, 0xffcc00, 0xffff00];
+  const dir = isReversed ? -1 : 1; // 반전 시 방향 반대
 
   // 파티클 여러 개 생성
   for (let i = 0; i < 3; i++) {
@@ -34,17 +36,17 @@ export function createBoostFlame(position) {
     });
     const particle = new THREE.Mesh(geo, mat);
 
-    // 말 뒤쪽에서 생성 (꼬리 부근)
+    // 말 뒤쪽에서 생성 (꼬리 부근) - 반전 시 반대 방향
     particle.position.copy(position);
     particle.position.x += (Math.random() - 0.5) * 8;
     particle.position.y += 5 + Math.random() * 5;
-    particle.position.z += 15 + Math.random() * 5; // 뒤쪽으로
+    particle.position.z += (15 + Math.random() * 5) * dir; // 뒤쪽으로 (반전 시 반대)
 
-    // 뒤쪽으로 퍼지는 속도
+    // 뒤쪽으로 퍼지는 속도 - 반전 시 반대 방향
     particle.userData.velocity = new THREE.Vector3(
       (Math.random() - 0.5) * 0.5,
       Math.random() * 0.5 + 0.3,
-      Math.random() * 1.5 + 0.5 // 뒤로 밀려남
+      (Math.random() * 1.5 + 0.5) * dir // 뒤로 밀려남 (반전 시 반대)
     );
     particle.userData.life = 1.0;
     particle.userData.decay = 0.03 + Math.random() * 0.02;
@@ -100,7 +102,7 @@ export function updateBoostEffects() {
  */
 export function emitBoostFlame(horse) {
   if (!horse || !horse.mesh) return;
-  createBoostFlame(horse.mesh.position);
+  createBoostFlame(horse.mesh.position, horse.isReversed);
 }
 
 /**

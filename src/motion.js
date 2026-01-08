@@ -186,9 +186,13 @@ export function updateStunMotion(horse, time) {
 export function updateWalkMotion(horse, time) {
   const { walk } = MotionConfig;
 
+  // 반전 상태 확인 - 반전 시 X축 회전 방향 반대
+  const dir = horse.isReversed ? -1 : 1;
+  const targetRotX = walk.targetRotationX * dir;
+
   // 몸을 앞으로 들어서 뒷발로 직립
   const currentRotX = horse.mesh.rotation.x;
-  horse.mesh.rotation.x += (walk.targetRotationX - currentRotX) * walk.rotationSpeed;
+  horse.mesh.rotation.x += (targetRotX - currentRotX) * walk.rotationSpeed;
 
   // 높이 올라감
   const currentY = horse.mesh.position.y;
