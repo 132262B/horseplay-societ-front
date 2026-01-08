@@ -1345,23 +1345,18 @@ function updateSystem() {
   });
 
   let leader = sorted[0];
-  let second = sorted[1];
-
   if (!leader) return;
 
+  // 실시간 순위 업데이트 (최대 10등까지)
+  updateLiveRanking(sorted);
+
+  // 결승선까지 남은 거리 계산 (카메라 전환용)
+  const isReversedLeader = leader.isReversed;
   let dist = Math.floor(Math.abs(finishLineZ - leader.mesh.position.z));
-  // 반전 상태면 Z가 결승선보다 크면 통과, 아니면 Z가 결승선보다 작으면 통과
-  if (isReversed) {
+  if (isReversedLeader) {
     if (leader.mesh.position.z >= finishLineZ) dist = 0;
   } else {
     if (leader.mesh.position.z <= finishLineZ) dist = 0;
-  }
-  document.getElementById('distLabel').innerText = `선두 남은 거리: ${dist}m`;
-
-  if (second && !leader.finished) {
-    let gap = Math.abs(second.mesh.position.z - leader.mesh.position.z);
-    document.getElementById('gapLabel').innerText = `2등과의 격차: ${Math.floor(gap)}m`;
-    document.getElementById('gapLabel').style.color = gap > 300 ? '#ff4757' : 'white';
   }
 
   // 맵 이벤트 체크
@@ -1450,6 +1445,34 @@ function addToRank(name) {
   li.innerText = `${finishedCount}위 : ${name}`;
   if (finishedCount === 1) li.classList.add('winner');
   list.appendChild(li);
+}
+
+/**
+ * 실시간 순위 업데이트 (최대 10등까지)
+ * @param {Horse3D[]} sortedHorses - 순위별로 정렬된 말 배열
+ */
+function updateLiveRanking(sortedHorses) {
+  const list = document.getElementById('rank-live-list');
+  if (!list) return;
+
+  // 최대 10등까지만 표시
+  const maxDisplay = Math.min(10, sortedHorses.length);
+
+  let html = '';
+  for (let i = 0; i < maxDisplay; i++) {
+    const horse = sortedHorses[i];
+    if (!horse) continue;
+
+    const rankClass = i < 3 ? `rank-${i + 1}` : '';
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+
+    html += `<li class="${rankClass}">
+      <span class="rank-num">${medal || (i + 1)}</span>
+      <span class="rank-name">${horse.name}</span>
+    </li>`;
+  }
+
+  list.innerHTML = html;
 }
 
 function animate() {

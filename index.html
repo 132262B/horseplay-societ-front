@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>병맛사</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Malgun Gothic', sans-serif; }
@@ -35,8 +36,28 @@
             border: 4px solid gold; color: white; border-radius: 20px; text-align: center; min-width: 300px; z-index: 20;
         }
 
-        .top-info { position: absolute; top: 20px; width: 100%; display: flex; justify-content: space-between; padding: 0 40px; box-sizing: border-box; }
-        .info-badge { background: rgba(0,0,0,0.5); color: #fff; padding: 10px 20px; border-radius: 10px; font-weight: bold; border: 1px solid #555; }
+        /* 기본값: 모바일/태블릿 (1280px 미만) */
+        .top-info { position: absolute; top: 5px; right: 5px; }
+        #rank-live { background: rgba(0,0,0,0.7); color: #fff; padding: 5px 6px; border-radius: 6px; border: 1px solid #555; min-width: 70px; max-height: 150px; overflow: hidden; }
+        #rank-live h3 { margin: 0 0 4px 0; color: #ffd700; font-size: 8px; text-align: center; border-bottom: 1px solid #555; padding-bottom: 3px; }
+        #rank-live-list { list-style: none; padding: 0; margin: 0; font-size: 7px; }
+        #rank-live-list li { padding: 1px 0; display: flex; align-items: center; }
+        #rank-live-list li .rank-num { width: 12px; font-weight: bold; color: #888; font-size: 7px; }
+        #rank-live-list li .rank-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 7px; }
+        #rank-live-list li.rank-1 { color: #ffd700; font-weight: bold; }
+        #rank-live-list li.rank-2 { color: #c0c0c0; }
+        #rank-live-list li.rank-3 { color: #cd7f32; }
+
+        /* 데스크탑 (1024px 이상) */
+        @media (min-width: 1024px) {
+            .top-info { top: 20px; right: 20px; }
+            #rank-live { padding: 15px 20px; border-radius: 10px; min-width: 180px; max-height: 350px; }
+            #rank-live h3 { margin-bottom: 10px; font-size: 16px; padding-bottom: 8px; }
+            #rank-live-list { font-size: 14px; }
+            #rank-live-list li { padding: 4px 0; }
+            #rank-live-list li .rank-num { width: 24px; font-size: 14px; }
+            #rank-live-list li .rank-name { font-size: 14px; }
+        }
 
         li { font-size: 24px; list-style: none; margin: 15px 0; border-bottom: 1px solid #444; padding-bottom: 5px; }
         .winner { color: gold; font-size: 30px; font-weight: bold; animation: blink 1s infinite; }
@@ -65,8 +86,10 @@
     <div id="countdown"></div>
     <div id="ui-layer">
         <div class="top-info">
-            <div class="info-badge" id="distLabel">남은 거리: 3500m</div>
-            <div class="info-badge" id="gapLabel">2등과의 격차: 0m</div>
+            <div id="rank-live">
+                <h3>🏇 실시간 순위</h3>
+                <ul id="rank-live-list"></ul>
+            </div>
         </div>
 
         <div id="setup-box">
