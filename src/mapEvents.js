@@ -14,21 +14,21 @@ export const MapEventType = {
  * 이벤트별 슬롯머신 표시 정보
  */
 export const MapEventDisplay = {
-  // [MapEventType.LIGHTNING]: {
-  //   name: '번개 낙뢰',
-  //   color: '#ffff00',
-  //   svg: `<svg viewBox="0 0 24 24" fill="#ffff00"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>`,
-  // },
-  // [MapEventType.REVERSE_GOAL]: {
-  //   name: '결승선 반전',
-  //   color: '#00ff88',
-  //   svg: `<svg viewBox="0 0 24 24" fill="#00ff88"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>`,
-  // },
-  // [MapEventType.OBSTACLE]: {
-  //   name: '장애물 낙하',
-  //   color: '#ff6b6b',
-  //   svg: `<svg viewBox="0 0 24 24" fill="#ff6b6b"><circle cx="12" cy="12" r="10"/><circle cx="8" cy="9" r="2" fill="#333"/><circle cx="15" cy="8" r="1.5" fill="#333"/><circle cx="16" cy="14" r="2" fill="#333"/><circle cx="9" cy="15" r="1.5" fill="#333"/></svg>`,
-  // },
+  [MapEventType.LIGHTNING]: {
+    name: '번개 낙뢰',
+    color: '#ffff00',
+    svg: `<svg viewBox="0 0 24 24" fill="#ffff00"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>`,
+  },
+  [MapEventType.REVERSE_GOAL]: {
+    name: '결승선 반전',
+    color: '#00ff88',
+    svg: `<svg viewBox="0 0 24 24" fill="#00ff88"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>`,
+  },
+  [MapEventType.OBSTACLE]: {
+    name: '장애물 낙하',
+    color: '#ff6b6b',
+    svg: `<svg viewBox="0 0 24 24" fill="#ff6b6b"><circle cx="12" cy="12" r="10"/><circle cx="8" cy="9" r="2" fill="#333"/><circle cx="15" cy="8" r="1.5" fill="#333"/><circle cx="16" cy="14" r="2" fill="#333"/><circle cx="9" cy="15" r="1.5" fill="#333"/></svg>`,
+  },
   [MapEventType.TELEPORT]: {
     name: '순간이동',
     color: '#aa55ff',

@@ -24,7 +24,28 @@ let cameraTarget = new THREE.Vector3(0, 10, -100); // 카메라가 바라보는 
 let raceStartFrame = 0; // 레이스 시작 프레임
 const SKILL_DELAY = 180; // 스킬 사용 가능까지 딜레이 (3초 = 180프레임)
 
-const colors = [0xff6b6b, 0x4caf50, 0x5d5dff, 0xffa040, 0x8e5b4b, 0xcccccc, 0x00bcd4, 0x9c27b0];
+const colors = [
+  0xff6b6b, // 연한 빨강
+  0x4caf50, // 초록
+  0x5d5dff, // 파랑
+  0xffa040, // 주황
+  0x8e5b4b, // 갈색
+  0xcccccc, // 회색
+  0x00bcd4, // 청록
+  0x9c27b0, // 보라
+  0xffeb3b, // 노랑
+  0xe91e63, // 핑크
+  0x795548, // 다크브라운
+  0x607d8b, // 청회색
+  0x3f51b5, // 인디고
+  0x009688, // 틸
+  0xff5722, // 딥오렌지
+  0x8bc34a, // 라이트그린
+  0xf44336, // 빨강
+  0x2196f3, // 라이트블루
+  0xcddc39, // 라임
+  0x673ab7, // 딥퍼플
+];
 
 // --- 폭죽 파티클 ---
 let fireworkParticles = [];
