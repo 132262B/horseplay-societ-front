@@ -1472,8 +1472,14 @@ function updateSystem() {
 
   // 결승선 근처 (우선순위 최고)
   if (dist <= 500 && dist > 0) {
-    desiredPos = new THREE.Vector3(400, 80, finishLineZ + 50);
-    desiredTarget = new THREE.Vector3(0, 20, finishLineZ);
+    if (isReversed) {
+      // 반전 시: 반대 방향에서 촬영
+      desiredPos = new THREE.Vector3(-140, 71, finishLineZ + 165);
+      desiredTarget = new THREE.Vector3(-47, 58, finishLineZ);
+    } else {
+      desiredPos = new THREE.Vector3(140, 71, finishLineZ - 165);
+      desiredTarget = new THREE.Vector3(47, 58, finishLineZ);
+    }
   }
   // 맵 이벤트 발동 중 (전체 조감도)
   else if (mapEventManager.isEventCameraActive()) {

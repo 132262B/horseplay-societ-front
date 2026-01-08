@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Camera Debug Tool</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; font-family: 'Consolas', monospace; }
+    canvas { display: block; }
+
+    #info-panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #0f0;
+      padding: 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      min-width: 400px;
+      z-index: 1000;
+      border: 1px solid #0f0;
+    }
+
+    #info-panel h2 {
+      margin-bottom: 15px;
+      color: #0ff;
+      font-size: 18px;
+    }
+
+    .info-row {
+      margin: 8px 0;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .info-label { color: #aaa; }
+    .info-value { color: #0f0; font-weight: bold; }
+
+    #code-output {
+      margin-top: 15px;
+      padding: 12px;
+      background: #111;
+      border-radius: 5px;
+      font-size: 11px;
+      color: #ff0;
+      word-break: break-all;
+      cursor: pointer;
+      border: 1px solid #333;
+      white-space: pre-wrap;
+    }
+
+    #code-output:hover {
+      background: #222;
+      border-color: #ff0;
+    }
+
+    #copy-msg {
+      color: #0f0;
+      font-size: 12px;
+      margin-top: 5px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    #controls-help {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      padding: 15px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      border: 1px solid #555;
+    }
+
+    #controls-help h3 { color: #0ff; margin-bottom: 10px; }
+    #controls-help div { margin: 5px 0; }
+    kbd {
+      background: #333;
+      padding: 2px 8px;
+      border-radius: 3px;
+      border: 1px solid #555;
+      color: #fff;
+    }
+
+    #target-marker {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      pointer-events: none;
+    }
+
+    #target-marker::before,
+    #target-marker::after {
+      content: '';
+      position: absolute;
+      background: rgba(255, 0, 0, 0.7);
+    }
+
+    #target-marker::before {
+      width: 2px;
+      height: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    #target-marker::after {
+      width: 20px;
+      height: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    #speed-control {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #333;
+    }
+
+    #speed-control input { width: 100%; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <div id="info-panel">
+    <h2>Camera Debug Tool</h2>
+
+    <div class="info-row">
+      <span class="info-label">Camera Position:</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">X:</span>
+      <span class="info-value" id="cam-x">0</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Y:</span>
+      <span class="info-value" id="cam-y">0</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Z:</span>
+      <span class="info-value" id="cam-z">0</span>
+    </div>
+
+    <div class="info-row" style="margin-top: 15px;">
+      <span class="info-label">Look At (Target):</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">X:</span>
+      <span class="info-value" id="target-x">0</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Y:</span>
+      <span class="info-value" id="target-y">0</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Z:</span>
+      <span class="info-value" id="target-z">0</span>
+    </div>
+
+    <div id="code-output" onclick="copyCode()">Click to copy code</div>
+    <div id="copy-msg">Copied!</div>
+
+    <div id="speed-control">
+      <span class="info-label">Move Speed: <span id="speed-value">5</span></span>
+      <input type="range" id="speed-slider" min="1" max="20" value="5">
+    </div>
+  </div>
+
+  <div id="controls-help">
+    <h3>Controls</h3>
+    <div><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> - Move</div>
+    <div><kbd>Space</kbd> - Up / <kbd>Shift</kbd> - Down</div>
+    <div><kbd>Mouse</kbd> - Look around (click to lock)</div>
+    <div><kbd>Scroll</kbd> - Adjust speed</div>
+    <div><kbd>R</kbd> - Reset position</div>
+    <div><kbd>1</kbd>~<kbd>5</kbd> - Preset positions</div>
+  </div>
+
+  <div id="target-marker"></div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    let scene, camera, renderer, dirLight;
+    let moveSpeed = 5;
+    let lookSpeed = 0.002;
+    let clouds = [];
+
+    let yaw = 0;
+    let pitch = 0;
+    const keys = {};
+    let targetDistance = 200;
+
+    const LANE_WIDTH = 30;
+    const MIN_LANES = 8;
+    let currentTrackWidth = LANE_WIDTH * MIN_LANES;
+    const finishLineZ = -3500;
+    const ORIGINAL_FINISH_Z = -3500;
+
+    const colors = [0xff6b6b, 0x4caf50, 0x5d5dff, 0xffa040, 0x8e5b4b, 0xcccccc, 0x00bcd4, 0x9c27b0];
+
+    function init() {
+      scene = new THREE.Scene();
+      scene.fog = new THREE.Fog(0x87ceeb, 800, 4000);
+
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
+      camera.position.set(550, 100, finishLineZ + 80);
+      yaw = -Math.PI / 4;
+      pitch = -0.1;
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      createSky();
+      createClouds();
+      createGround();
+      createTrack(8);
+      createFinishLine();
+      createStartLine();
+      createBillboard();
+      createHorseMarkers();
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+
+      dirLight = new THREE.DirectionalLight(0xfffacd, 1.2);
+      dirLight.position.set(100, 200, 100);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      dirLight.shadow.camera.left = -300;
+      dirLight.shadow.camera.right = 300;
+      dirLight.shadow.camera.top = 300;
+      dirLight.shadow.camera.bottom = -300;
+      scene.add(dirLight);
+
+      const sunGeo = new THREE.SphereGeometry(50, 16, 16);
+      const sunMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      const sun = new THREE.Mesh(sunGeo, sunMat);
+      sun.position.set(500, 400, -2000);
+      scene.add(sun);
+
+      window.addEventListener('resize', onWindowResize);
+      window.addEventListener('keydown', (e) => keys[e.code] = true);
+      window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+      renderer.domElement.addEventListener('click', () => {
+        renderer.domElement.requestPointerLock();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (document.pointerLockElement === renderer.domElement) {
+          yaw -= e.movementX * lookSpeed;
+          pitch -= e.movementY * lookSpeed;
+          pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch));
+        }
+      });
+
+      document.getElementById('speed-slider').addEventListener('input', (e) => {
+        moveSpeed = parseFloat(e.target.value);
+        document.getElementById('speed-value').textContent = moveSpeed;
+      });
+
+      window.addEventListener('wheel', (e) => {
+        moveSpeed = Math.max(1, Math.min(20, moveSpeed - e.deltaY * 0.01));
+        document.getElementById('speed-slider').value = moveSpeed;
+        document.getElementById('speed-value').textContent = moveSpeed.toFixed(1);
+      });
+
+      animate();
+    }
+
+    function createSky() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+      gradient.addColorStop(0, '#1e3c72');
+      gradient.addColorStop(0.3, '#2a5298');
+      gradient.addColorStop(0.6, '#87ceeb');
+      gradient.addColorStop(1, '#b0e0e6');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+      const skyTexture = new THREE.CanvasTexture(canvas);
+      scene.background = skyTexture;
+    }
+
+    function createClouds() {
+      const cloudGroup = new THREE.Group();
+
+      for (let i = 0; i < 30; i++) {
+        const cloud = new THREE.Group();
+        const puffCount = 3 + Math.floor(Math.random() * 4);
+
+        for (let j = 0; j < puffCount; j++) {
+          const puffGeo = new THREE.SphereGeometry(20 + Math.random() * 30, 8, 6);
+          const puffMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.85,
+          });
+          const puff = new THREE.Mesh(puffGeo, puffMat);
+          puff.position.set(j * 25 - puffCount * 12, Math.random() * 10 - 5, Math.random() * 15 - 7);
+          puff.scale.y = 0.6;
+          cloud.add(puff);
+        }
+
+        cloud.position.set(Math.random() * 2000 - 1000, 150 + Math.random() * 200, Math.random() * -4500);
+        cloud.userData.speed = 0.1 + Math.random() * 0.2;
+        cloudGroup.add(cloud);
+        clouds.push(cloud);
+      }
+
+      scene.add(cloudGroup);
+    }
+
+    function updateClouds() {
+      clouds.forEach((cloud) => {
+        cloud.position.x += cloud.userData.speed;
+        if (cloud.position.x > 1200) {
+          cloud.position.x = -1200;
+        }
+      });
+    }
+
+    function createGround() {
+      const grassGeo = new THREE.PlaneGeometry(2000, 10000);
+      const grassMat = new THREE.MeshStandardMaterial({ color: 0x228b22 });
+      const grass = new THREE.Mesh(grassGeo, grassMat);
+      grass.rotation.x = -Math.PI / 2;
+      grass.position.set(0, -0.5, -2000);
+      grass.receiveShadow = true;
+      scene.add(grass);
+    }
+
+    function createTrack(laneCount) {
+      const lanes = Math.max(MIN_LANES, Math.min(20, laneCount));
+      currentTrackWidth = LANE_WIDTH * lanes;
+
+      const trackGeo = new THREE.PlaneGeometry(currentTrackWidth, 10000);
+      const trackMat = new THREE.MeshStandardMaterial({ color: 0xc2956e });
+      const track = new THREE.Mesh(trackGeo, trackMat);
+      track.rotation.x = -Math.PI / 2;
+      track.position.set(0, 0, -2000);
+      track.receiveShadow = true;
+      scene.add(track);
+
+      const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const lineGeo = new THREE.PlaneGeometry(2, 10000);
+
+      for (let i = 1; i < lanes; i++) {
+        const line = new THREE.Mesh(lineGeo.clone(), lineMat.clone());
+        line.rotation.x = -Math.PI / 2;
+        line.position.set(-currentTrackWidth / 2 + i * LANE_WIDTH, 0.5, -2000);
+        scene.add(line);
+      }
+
+      const borderGeo = new THREE.PlaneGeometry(5, 10000);
+      const borderMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+
+      const leftBorder = new THREE.Mesh(borderGeo.clone(), borderMat.clone());
+      leftBorder.rotation.x = -Math.PI / 2;
+      leftBorder.position.set(-currentTrackWidth / 2, 0.5, -2000);
+      scene.add(leftBorder);
+
+      const rightBorder = new THREE.Mesh(borderGeo.clone(), borderMat.clone());
+      rightBorder.rotation.x = -Math.PI / 2;
+      rightBorder.position.set(currentTrackWidth / 2, 0.5, -2000);
+      scene.add(rightBorder);
+
+      // 광고판 (레이싱 경기장 스타일)
+      const adBoardHeight = 25;
+      const adBoardLength = 100;
+      const adBoardGap = 10;
+      const adBoardThickness = 2;
+      const adBoardY = adBoardHeight / 2;
+      const adBoardOffset = 30;
+      const totalBoardLength = 4500;
+
+      const frameMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+      const screenMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.1 });
+
+      // 왼쪽 프레임
+      const frameGeoL = new THREE.BoxGeometry(adBoardThickness + 2, adBoardHeight + 4, totalBoardLength);
+      const frameL = new THREE.Mesh(frameGeoL, frameMat.clone());
+      frameL.position.set(-currentTrackWidth / 2 - adBoardOffset, adBoardY, -totalBoardLength / 2);
+      scene.add(frameL);
+
+      // 오른쪽 프레임
+      const frameGeoR = new THREE.BoxGeometry(adBoardThickness + 2, adBoardHeight + 4, totalBoardLength);
+      const frameR = new THREE.Mesh(frameGeoR, frameMat.clone());
+      frameR.position.set(currentTrackWidth / 2 + adBoardOffset, adBoardY, -totalBoardLength / 2);
+      scene.add(frameR);
+
+      // 흰색 스크린 패널들
+      for (let z = 0; z > -4500; z -= (adBoardLength + adBoardGap)) {
+        const screenGeoL = new THREE.BoxGeometry(adBoardThickness, adBoardHeight, adBoardLength);
+        const screenL = new THREE.Mesh(screenGeoL, screenMat.clone());
+        screenL.position.set(-currentTrackWidth / 2 - adBoardOffset + 3, adBoardY, z - adBoardLength / 2);
+        scene.add(screenL);
+
+        const screenGeoR = new THREE.BoxGeometry(adBoardThickness, adBoardHeight, adBoardLength);
+        const screenR = new THREE.Mesh(screenGeoR, screenMat.clone());
+        screenR.position.set(currentTrackWidth / 2 + adBoardOffset - 3, adBoardY, z - adBoardLength / 2);
+        scene.add(screenR);
+      }
+
+      // 거리 표시
+      for (let dist = 500; dist <= 3500; dist += 500) {
+        const markerCanvas = document.createElement('canvas');
+        markerCanvas.width = 128;
+        markerCanvas.height = 64;
+        const mctx = markerCanvas.getContext('2d');
+        mctx.fillStyle = '#ffffff';
+        mctx.fillRect(0, 0, 128, 64);
+        mctx.fillStyle = '#000000';
+        mctx.font = 'bold 40px Arial';
+        mctx.textAlign = 'center';
+        mctx.fillText(`${dist}m`, 64, 48);
+
+        const markerTexture = new THREE.CanvasTexture(markerCanvas);
+        const markerMat = new THREE.MeshBasicMaterial({ map: markerTexture });
+        const markerGeo = new THREE.PlaneGeometry(20, 10);
+
+        const markerL = new THREE.Mesh(markerGeo.clone(), markerMat.clone());
+        markerL.position.set(-currentTrackWidth / 2 - 50, 30, -dist);
+        markerL.rotation.y = Math.PI / 4;
+        scene.add(markerL);
+
+        const markerR = new THREE.Mesh(markerGeo.clone(), markerMat.clone());
+        markerR.position.set(currentTrackWidth / 2 + 50, 30, -dist);
+        markerR.rotation.y = -Math.PI / 4;
+        scene.add(markerR);
+      }
+    }
+
+    function createStartLine() {
+      const checkCanvas = document.createElement('canvas');
+      checkCanvas.width = 128;
+      checkCanvas.height = 32;
+      const ctx = checkCanvas.getContext('2d');
+      const squareSize = 16;
+
+      for (let x = 0; x < checkCanvas.width; x += squareSize) {
+        for (let y = 0; y < checkCanvas.height; y += squareSize) {
+          const isWhite = ((x / squareSize) + (y / squareSize)) % 2 === 0;
+          ctx.fillStyle = isWhite ? '#ffffff' : '#000000';
+          ctx.fillRect(x, y, squareSize, squareSize);
+        }
+      }
+
+      const checkTexture = new THREE.CanvasTexture(checkCanvas);
+      checkTexture.wrapS = THREE.RepeatWrapping;
+      checkTexture.wrapT = THREE.RepeatWrapping;
+      checkTexture.repeat.set(currentTrackWidth / 30, 1);
+
+      const startLineGeo = new THREE.PlaneGeometry(currentTrackWidth + 20, 10);
+      const startLineMat = new THREE.MeshBasicMaterial({ map: checkTexture });
+      const startLine = new THREE.Mesh(startLineGeo, startLineMat);
+      startLine.rotation.x = -Math.PI / 2;
+      startLine.position.set(0, 1, 0);
+      scene.add(startLine);
+    }
+
+    function createFinishLine() {
+      const finishLineGeo = new THREE.BoxGeometry(currentTrackWidth + 20, 10, 15);
+      const finishLineMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+      const finishLine = new THREE.Mesh(finishLineGeo, finishLineMat);
+      finishLine.position.set(0, 5, finishLineZ);
+      scene.add(finishLine);
+
+      const gatePostGeo = new THREE.BoxGeometry(10, 80, 10);
+      const gatePostMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+
+      const gateL = new THREE.Mesh(gatePostGeo.clone(), gatePostMat.clone());
+      gateL.position.set(-currentTrackWidth / 2 - 15, 40, finishLineZ);
+      gateL.castShadow = true;
+      scene.add(gateL);
+
+      const gateR = new THREE.Mesh(gatePostGeo.clone(), gatePostMat.clone());
+      gateR.position.set(currentTrackWidth / 2 + 15, 40, finishLineZ);
+      gateR.castShadow = true;
+      scene.add(gateR);
+
+      const gateTopGeo = new THREE.BoxGeometry(currentTrackWidth + 50, 15, 15);
+      const gateTop = new THREE.Mesh(gateTopGeo, gatePostMat.clone());
+      gateTop.position.set(0, 85, finishLineZ);
+      scene.add(gateTop);
+
+      const finishCanvas = document.createElement('canvas');
+      finishCanvas.width = 512;
+      finishCanvas.height = 128;
+      const fctx = finishCanvas.getContext('2d');
+      fctx.fillStyle = '#ff0000';
+      fctx.fillRect(0, 0, 512, 128);
+      fctx.fillStyle = '#ffffff';
+      fctx.font = 'bold 80px Arial';
+      fctx.textAlign = 'center';
+      fctx.fillText('FINISH', 256, 95);
+
+      const finishTexture = new THREE.CanvasTexture(finishCanvas);
+      const finishSignMat = new THREE.MeshBasicMaterial({ map: finishTexture });
+      const finishSign = new THREE.Mesh(new THREE.PlaneGeometry(100, 25), finishSignMat);
+      finishSign.position.set(0, 110, finishLineZ + 1);
+      scene.add(finishSign);
+    }
+
+    function createBillboard() {
+      const billboardZ = ORIGINAL_FINISH_Z / 2;
+      const billboardX = -(currentTrackWidth / 2 + 80);
+
+      const postGeo = new THREE.BoxGeometry(12, 180, 12);
+      const postMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+
+      const postL = new THREE.Mesh(postGeo, postMat);
+      postL.position.set(billboardX, 90, billboardZ - 90);
+      postL.castShadow = true;
+      scene.add(postL);
+
+      const postR = new THREE.Mesh(postGeo, postMat);
+      postR.position.set(billboardX, 90, billboardZ + 90);
+      postR.castShadow = true;
+      scene.add(postR);
+
+      const frameGeo = new THREE.BoxGeometry(8, 105, 210);
+      const frameMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+      const frame = new THREE.Mesh(frameGeo, frameMat);
+      frame.position.set(billboardX, 150, billboardZ);
+      scene.add(frame);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 768;
+      canvas.height = 384;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, 768, 384);
+
+      ctx.strokeStyle = '#00ff88';
+      ctx.lineWidth = 12;
+      ctx.strokeRect(15, 15, 738, 354);
+
+      ctx.fillStyle = '#00ff88';
+      ctx.font = 'bold 108px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = '#00ff88';
+      ctx.shadowBlur = 30;
+      ctx.fillText('Play Mcp', 384, 192);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const screenMat = new THREE.MeshBasicMaterial({ map: texture });
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(195, 90), screenMat);
+      screen.position.set(billboardX + 5, 150, billboardZ);
+      screen.rotation.y = Math.PI / 2;
+      scene.add(screen);
+
+      const screenBack = new THREE.Mesh(new THREE.PlaneGeometry(195, 90), screenMat);
+      screenBack.position.set(billboardX - 5, 150, billboardZ);
+      screenBack.rotation.y = -Math.PI / 2;
+      scene.add(screenBack);
+    }
+
+    function createHorseMarkers() {
+      const positions = [
+        { x: -105, z: finishLineZ + 100 },
+        { x: -75, z: finishLineZ + 150 },
+        { x: -45, z: finishLineZ + 80 },
+        { x: -15, z: finishLineZ + 200 },
+        { x: 15, z: finishLineZ + 120 },
+        { x: 45, z: finishLineZ + 180 },
+        { x: 75, z: finishLineZ + 90 },
+        { x: 105, z: finishLineZ + 160 },
+      ];
+
+      positions.forEach((pos, i) => {
+        // 간단한 말 형태
+        const bodyGeo = new THREE.CapsuleGeometry(6, 18, 8, 16);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: colors[i] });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.rotation.x = Math.PI / 2;
+        body.position.set(pos.x, 15, pos.z);
+        body.castShadow = true;
+        scene.add(body);
+
+        // 머리
+        const headGeo = new THREE.BoxGeometry(5, 6, 10);
+        const head = new THREE.Mesh(headGeo, bodyMat.clone());
+        head.position.set(pos.x, 24, pos.z - 15);
+        head.rotation.x = -0.3;
+        scene.add(head);
+
+        // 다리 4개
+        const legGeo = new THREE.CylinderGeometry(1.5, 1, 12, 6);
+        const legMat = new THREE.MeshStandardMaterial({ color: colors[i] });
+        const legPositions = [
+          { x: pos.x - 4, z: pos.z + 7 },
+          { x: pos.x + 4, z: pos.z + 7 },
+          { x: pos.x - 4, z: pos.z - 7 },
+          { x: pos.x + 4, z: pos.z - 7 },
+        ];
+
+        legPositions.forEach(lp => {
+          const leg = new THREE.Mesh(legGeo.clone(), legMat.clone());
+          leg.position.set(lp.x, 6, lp.z);
+          scene.add(leg);
+        });
+
+        // 이름표
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, 256, 64, 10);
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 28px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Horse ${i + 1}`, 128, 43);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const labelMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const label = new THREE.Sprite(labelMat);
+        label.scale.set(28, 7, 1);
+        label.position.set(pos.x, 45, pos.z);
+        scene.add(label);
+      });
+    }
+
+    function updateCamera() {
+      const forward = new THREE.Vector3();
+      const right = new THREE.Vector3();
+
+      forward.x = Math.sin(yaw) * Math.cos(pitch);
+      forward.y = Math.sin(pitch);
+      forward.z = Math.cos(yaw) * Math.cos(pitch);
+
+      right.x = Math.sin(yaw - Math.PI / 2);
+      right.z = Math.cos(yaw - Math.PI / 2);
+
+      if (keys['KeyW']) camera.position.addScaledVector(forward, moveSpeed);
+      if (keys['KeyS']) camera.position.addScaledVector(forward, -moveSpeed);
+      if (keys['KeyA']) camera.position.addScaledVector(right, moveSpeed);
+      if (keys['KeyD']) camera.position.addScaledVector(right, -moveSpeed);
+      if (keys['Space']) camera.position.y += moveSpeed;
+      if (keys['ShiftLeft'] || keys['ShiftRight']) camera.position.y -= moveSpeed;
+
+      // Reset
+      if (keys['KeyR']) {
+        camera.position.set(0, 50, 100);
+        yaw = 0;
+        pitch = 0;
+      }
+
+      // Presets
+      if (keys['Digit1']) {
+        camera.position.set(0, 60, 150);
+        yaw = 0; pitch = -0.1;
+      }
+      if (keys['Digit2']) {
+        camera.position.set(550, 100, finishLineZ + 80);
+        yaw = -Math.PI / 4; pitch = -0.1;
+      }
+      if (keys['Digit3']) {
+        camera.position.set(0, 300, finishLineZ / 2);
+        yaw = 0; pitch = -0.5;
+      }
+      if (keys['Digit4']) {
+        camera.position.set(currentTrackWidth + 100, 60, finishLineZ / 2);
+        yaw = -Math.PI / 2; pitch = 0;
+      }
+      if (keys['Digit5']) {
+        camera.position.set(0, 50, finishLineZ - 100);
+        yaw = Math.PI; pitch = 0;
+      }
+
+      const lookTarget = new THREE.Vector3(
+        camera.position.x + forward.x * targetDistance,
+        camera.position.y + forward.y * targetDistance,
+        camera.position.z + forward.z * targetDistance
+      );
+
+      camera.lookAt(lookTarget);
+
+      // Update UI
+      document.getElementById('cam-x').textContent = camera.position.x.toFixed(0);
+      document.getElementById('cam-y').textContent = camera.position.y.toFixed(0);
+      document.getElementById('cam-z').textContent = camera.position.z.toFixed(0);
+      document.getElementById('target-x').textContent = lookTarget.x.toFixed(0);
+      document.getElementById('target-y').textContent = lookTarget.y.toFixed(0);
+      document.getElementById('target-z').textContent = lookTarget.z.toFixed(0);
+
+      // Code output (finishLineZ 기준)
+      const relZ = camera.position.z - finishLineZ;
+      const code = `desiredPos = new THREE.Vector3(${camera.position.x.toFixed(0)}, ${camera.position.y.toFixed(0)}, finishLineZ + ${relZ.toFixed(0)});
+desiredTarget = new THREE.Vector3(${lookTarget.x.toFixed(0)}, ${lookTarget.y.toFixed(0)}, finishLineZ);`;
+      document.getElementById('code-output').textContent = code;
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      updateClouds();
+      updateCamera();
+      renderer.render(scene, camera);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    window.copyCode = function() {
+      const code = document.getElementById('code-output').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        const msg = document.getElementById('copy-msg');
+        msg.style.opacity = 1;
+        setTimeout(() => msg.style.opacity = 0, 1500);
+      });
+    };
+
+    init();
+  </script>
+</body>
+</html>
