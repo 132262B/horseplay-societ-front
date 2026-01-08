@@ -1102,8 +1102,8 @@ class Horse3D {
 
     scene.add(this.mesh);
 
-    // 말마다 고유 속도 (0.70 ~ 0.95)
-    this.baseSpeed = Math.random() * 0.25 + 0.70;
+    // 말마다 고유 속도 (1.2 ~ 1.6)
+    this.baseSpeed = Math.random() * 0.4 + 1.2;
     this.speed = this.baseSpeed;
     this.finished = false;
     this.status = SkillType.RUN;
@@ -1140,10 +1140,10 @@ class Horse3D {
       this.speed = this.baseSpeed * rubberBand;
     }
 
-    // 가끔 속도 변동 (순간적인 컨디션 변화)
-    if (Math.random() < 0.01) {
-      this.speed = this.baseSpeed * (0.85 + Math.random() * 0.3);
-    }
+    // 지속적인 속도 변동 (말마다 다른 리듬)
+    const time = Date.now() * 0.001 + this.wobbleOffset;
+    const speedVariation = Math.sin(time * 0.5) * 0.1 + Math.sin(time * 1.3) * 0.05;
+    this.speed = this.speed * (1 + speedVariation);
 
     // 스킬에 따른 속도 계산 (모듈 사용)
     let currentSpeed = calculateSkillSpeed(this.status, this.speed);
