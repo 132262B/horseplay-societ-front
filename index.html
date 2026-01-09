@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -10,165 +11,509 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Malgun Gothic', sans-serif; }
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Malgun Gothic', sans-serif;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
 
         #setup-box {
-            pointer-events: auto; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.85); padding: 40px; border-radius: 20px; text-align: center; border: 2px solid #5d5dff;
-            color: white; box-shadow: 0 0 40px rgba(93, 93, 255, 0.4); z-index: 10;
+            pointer-events: auto;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            border: 2px solid #5d5dff;
+            color: white;
+            box-shadow: 0 0 40px rgba(93, 93, 255, 0.4);
+            z-index: 10;
         }
-        textarea { width: 300px; height: 120px; background: #222; color: #fff; border: 1px solid #555; padding: 10px; font-size: 16px; }
+
+        textarea {
+            width: 300px;
+            height: 120px;
+            background: #222;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 10px;
+            font-size: 16px;
+        }
+
         button {
-            background: #5d5dff; color: white; border: none; padding: 15px 40px; font-size: 20px;
-            margin-top: 20px; cursor: pointer; font-weight: bold; border-radius: 50px; transition: 0.3s;
+            background: #5d5dff;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 20px;
+            margin-top: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 50px;
+            transition: 0.3s;
         }
-        button:hover { background: #8e8eff; transform: scale(1.05); }
+
+        button:hover {
+            background: #8e8eff;
+            transform: scale(1.05);
+        }
 
         #broadcast {
-            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
-            width: 80%; text-align: center; pointer-events: none;
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            text-align: center;
+            pointer-events: none;
         }
+
         #broadcast-text {
-            background: rgba(0,0,0,0.7); color: #00ffcc; padding: 15px 30px;
-            font-size: 24px; border-radius: 30px; display: inline-block;
-            text-shadow: 0 0 10px #00ffcc; border: 1px solid #00ffcc; transition: transform 0.1s;
+            background: rgba(0, 0, 0, 0.7);
+            color: #00ffcc;
+            padding: 15px 30px;
+            font-size: 24px;
+            border-radius: 30px;
+            display: inline-block;
+            text-shadow: 0 0 10px #00ffcc;
+            border: 1px solid #00ffcc;
+            transition: transform 0.1s;
         }
 
         #rank-board {
-            display: none; pointer-events: auto; position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%); background: rgba(0,0,0,0.95); padding: 40px;
-            border: 4px solid gold; color: white; border-radius: 20px; text-align: center; min-width: 300px; z-index: 20;
+            display: none;
+            pointer-events: auto;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 40px;
+            border: 4px solid gold;
+            color: white;
+            border-radius: 20px;
+            text-align: center;
+            min-width: 300px;
+            z-index: 20;
         }
 
         /* 기본값: 모바일/태블릿 (1280px 미만) */
-        .top-info { position: absolute; top: 5px; right: 5px; }
-        #rank-live { background: rgba(0,0,0,0.7); color: #fff; padding: 5px 6px; border-radius: 6px; border: 1px solid #555; min-width: 70px; max-height: 150px; overflow: hidden; }
-        #rank-live h3 { margin: 0 0 4px 0; color: #ffd700; font-size: 8px; text-align: center; border-bottom: 1px solid #555; padding-bottom: 3px; }
-        #rank-live-list { list-style: none; padding: 0; margin: 0; font-size: 7px; }
-        #rank-live-list li { padding: 1px 0; display: flex; align-items: center; }
-        #rank-live-list li .rank-num { width: 12px; font-weight: bold; color: #888; font-size: 7px; }
-        #rank-live-list li .rank-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 7px; }
-        #rank-live-list li.rank-1 { color: #ffd700; font-weight: bold; }
-        #rank-live-list li.rank-2 { color: #c0c0c0; }
-        #rank-live-list li.rank-3 { color: #cd7f32; }
+        .top-info {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+        }
+
+        #rank-live {
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 5px 6px;
+            border-radius: 6px;
+            border: 1px solid #555;
+            min-width: 70px;
+            max-height: 150px;
+            overflow: hidden;
+        }
+
+        #rank-live h3 {
+            margin: 0 0 4px 0;
+            color: #ffd700;
+            font-size: 8px;
+            text-align: center;
+            border-bottom: 1px solid #555;
+            padding-bottom: 3px;
+        }
+
+        #rank-live-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 7px;
+        }
+
+        #rank-live-list li {
+            padding: 1px 0;
+            display: flex;
+            align-items: center;
+        }
+
+        #rank-live-list li .rank-num {
+            width: 12px;
+            font-weight: bold;
+            color: #888;
+            font-size: 7px;
+        }
+
+        #rank-live-list li .rank-name {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 7px;
+        }
+
+        #rank-live-list li.rank-1 {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        #rank-live-list li.rank-2 {
+            color: #c0c0c0;
+        }
+
+        #rank-live-list li.rank-3 {
+            color: #cd7f32;
+        }
 
         /* 데스크탑 (1024px 이상) */
         @media (min-width: 1024px) {
-            .top-info { top: 20px; right: 20px; }
-            #rank-live { padding: 15px 20px; border-radius: 10px; min-width: 180px; max-height: 350px; }
-            #rank-live h3 { margin-bottom: 10px; font-size: 16px; padding-bottom: 8px; }
-            #rank-live-list { font-size: 14px; }
-            #rank-live-list li { padding: 4px 0; }
-            #rank-live-list li .rank-num { width: 24px; font-size: 14px; }
-            #rank-live-list li .rank-name { font-size: 14px; }
+            .top-info {
+                top: 20px;
+                right: 20px;
+            }
+
+            #rank-live {
+                padding: 15px 20px;
+                border-radius: 10px;
+                min-width: 180px;
+                max-height: 350px;
+            }
+
+            #rank-live h3 {
+                margin-bottom: 10px;
+                font-size: 16px;
+                padding-bottom: 8px;
+            }
+
+            #rank-live-list {
+                font-size: 14px;
+            }
+
+            #rank-live-list li {
+                padding: 4px 0;
+            }
+
+            #rank-live-list li .rank-num {
+                width: 24px;
+                font-size: 14px;
+            }
+
+            #rank-live-list li .rank-name {
+                font-size: 14px;
+            }
         }
 
-        li { font-size: 24px; list-style: none; margin: 15px 0; border-bottom: 1px solid #444; padding-bottom: 5px; }
-        .winner { color: gold; font-size: 30px; font-weight: bold; animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0.5; } }
+        li {
+            font-size: 24px;
+            list-style: none;
+            margin: 15px 0;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+
+        .winner {
+            color: gold;
+            font-size: 30px;
+            font-weight: bold;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0.5;
+            }
+        }
 
         #flash-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white;
-            opacity: 0; pointer-events: none; transition: opacity 0.1s; z-index: 5;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.1s;
+            z-index: 5;
         }
 
         #countdown {
-            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 200px; font-weight: bold; color: #fff; text-shadow: 0 0 50px #ff0, 0 0 100px #f00;
-            z-index: 15; animation: countPulse 0.5s ease-out;
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 200px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 50px #ff0, 0 0 100px #f00;
+            z-index: 15;
+            animation: countPulse 0.5s ease-out;
         }
+
         @keyframes countPulse {
-            0% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
-            50% { opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            0% {
+                transform: translate(-50%, -50%) scale(1.5);
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
         }
 
         #sound-toggle {
-            pointer-events: auto; position: absolute; bottom: 20px; right: 20px;
-            width: 44px; height: 44px; background: rgba(0,0,0,0.7); border: 1px solid #555;
-            border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: 0.2s; z-index: 100;
+            pointer-events: auto;
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #555;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+            z-index: 100;
         }
-        #sound-toggle:hover { background: rgba(50,50,50,0.9); border-color: #888; }
-        #sound-toggle svg { width: 24px; height: 24px; fill: #fff; }
+
+        #sound-toggle:hover {
+            background: rgba(50, 50, 50, 0.9);
+            border-color: #888;
+        }
+
+        #sound-toggle svg {
+            width: 24px;
+            height: 24px;
+            fill: #fff;
+        }
 
         /* 슬롯머신 스타일 */
         #roulette-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); z-index: 50; justify-content: center; align-items: center;
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 50;
+            justify-content: center;
+            align-items: center;
         }
+
         #slot-machine {
-            position: relative; background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
-            border-radius: 20px; padding: 30px 40px; border: 4px solid #ffd700;
-            box-shadow: 0 0 40px rgba(255,215,0,0.4), inset 0 0 30px rgba(0,0,0,0.5);
+            position: relative;
+            background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+            border-radius: 20px;
+            padding: 30px 40px;
+            border: 4px solid #ffd700;
+            box-shadow: 0 0 40px rgba(255, 215, 0, 0.4), inset 0 0 30px rgba(0, 0, 0, 0.5);
         }
+
         #slot-title {
-            text-align: center; color: #ffd700; font-size: 24px; font-weight: bold;
-            margin-bottom: 15px; text-shadow: 0 0 10px #ffd700;
+            text-align: center;
+            color: #ffd700;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px #ffd700;
         }
+
         #slot-frame {
-            background: #111; border-radius: 15px; padding: 10px;
-            border: 3px solid #444; position: relative; overflow: hidden;
+            background: #111;
+            border-radius: 15px;
+            padding: 10px;
+            border: 3px solid #444;
+            position: relative;
+            overflow: hidden;
         }
+
         #slot-window {
-            width: 160px; height: 120px; overflow: hidden; position: relative;
+            width: 160px;
+            height: 120px;
+            overflow: hidden;
+            position: relative;
             background: linear-gradient(to bottom, #000 0%, #1a1a1a 20%, #1a1a1a 80%, #000 100%);
             border-radius: 10px;
         }
+
         #slot-reel {
-            display: flex; flex-direction: column; transition: transform 3s cubic-bezier(0.15, 0.85, 0.20, 1);
+            display: flex;
+            flex-direction: column;
+            transition: transform 3s cubic-bezier(0.15, 0.85, 0.20, 1);
         }
+
         .slot-item {
-            width: 160px; height: 120px; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; flex-shrink: 0;
+            width: 160px;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
         }
-        .slot-item svg { width: 60px; height: 60px; filter: drop-shadow(0 0 8px currentColor); }
+
+        .slot-item svg {
+            width: 60px;
+            height: 60px;
+            filter: drop-shadow(0 0 8px currentColor);
+        }
+
         .slot-item-label {
-            margin-top: 8px; font-size: 16px; font-weight: bold; color: #fff;
+            margin-top: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
             text-shadow: 0 0 5px currentColor;
         }
+
         #slot-highlight {
-            position: absolute; top: 50%; left: 0; right: 0; height: 124px;
-            transform: translateY(-50%); border: 3px solid #ffd700; border-radius: 8px;
-            pointer-events: none; box-shadow: 0 0 15px rgba(255,215,0,0.5);
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 124px;
+            transform: translateY(-50%);
+            border: 3px solid #ffd700;
+            border-radius: 8px;
+            pointer-events: none;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
         }
-        #slot-pointer-left, #slot-pointer-right {
-            position: absolute; top: 50%; transform: translateY(-50%);
-            width: 0; height: 0; border-top: 15px solid transparent; border-bottom: 15px solid transparent;
+
+        #slot-pointer-left,
+        #slot-pointer-right {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-top: 15px solid transparent;
+            border-bottom: 15px solid transparent;
         }
-        #slot-pointer-left { left: -8px; border-right: 20px solid #ffd700; }
-        #slot-pointer-right { right: -8px; border-left: 20px solid #ffd700; }
+
+        #slot-pointer-left {
+            left: -8px;
+            border-right: 20px solid #ffd700;
+        }
+
+        #slot-pointer-right {
+            right: -8px;
+            border-left: 20px solid #ffd700;
+        }
+
         #slot-result {
-            text-align: center; margin-top: 20px; font-size: 22px; font-weight: bold;
-            color: #fff; text-shadow: 0 0 15px currentColor; min-height: 30px;
-            opacity: 0; transition: opacity 0.3s;
+            text-align: center;
+            margin-top: 20px;
+            font-size: 22px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 15px currentColor;
+            min-height: 30px;
+            opacity: 0;
+            transition: opacity 0.3s;
         }
-        #slot-result.show { opacity: 1; }
+
+        #slot-result.show {
+            opacity: 1;
+        }
+
         @keyframes slotGlow {
-            0%, 100% { box-shadow: 0 0 40px rgba(255,215,0,0.4), inset 0 0 30px rgba(0,0,0,0.5); }
-            50% { box-shadow: 0 0 60px rgba(255,215,0,0.8), inset 0 0 30px rgba(0,0,0,0.5); }
+
+            0%,
+            100% {
+                box-shadow: 0 0 40px rgba(255, 215, 0, 0.4), inset 0 0 30px rgba(0, 0, 0, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 60px rgba(255, 215, 0, 0.8), inset 0 0 30px rgba(0, 0, 0, 0.5);
+            }
         }
-        #slot-machine.spinning { animation: slotGlow 0.3s ease-in-out infinite; }
+
+        #slot-machine.spinning {
+            animation: slotGlow 0.3s ease-in-out infinite;
+        }
+
         .slot-lights {
-            position: absolute; display: flex; gap: 8px;
+            position: absolute;
+            display: flex;
+            gap: 8px;
         }
-        .slot-lights.top { top: 8px; left: 50%; transform: translateX(-50%); }
-        .slot-lights.bottom { bottom: 8px; left: 50%; transform: translateX(-50%); }
+
+        .slot-lights.top {
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .slot-lights.bottom {
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
         .slot-light {
-            width: 12px; height: 12px; border-radius: 50%; background: #ff0;
-            box-shadow: 0 0 8px #ff0; animation: lightBlink 0.5s ease-in-out infinite alternate;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff0;
+            box-shadow: 0 0 8px #ff0;
+            animation: lightBlink 0.5s ease-in-out infinite alternate;
         }
-        .slot-light:nth-child(2) { animation-delay: 0.1s; }
-        .slot-light:nth-child(3) { animation-delay: 0.2s; }
-        .slot-light:nth-child(4) { animation-delay: 0.3s; }
-        .slot-light:nth-child(5) { animation-delay: 0.4s; }
+
+        .slot-light:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+
+        .slot-light:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+
+        .slot-light:nth-child(4) {
+            animation-delay: 0.3s;
+        }
+
+        .slot-light:nth-child(5) {
+            animation-delay: 0.4s;
+        }
+
         @keyframes lightBlink {
-            0% { opacity: 0.3; background: #ff6600; box-shadow: 0 0 5px #ff6600; }
-            100% { opacity: 1; background: #ffff00; box-shadow: 0 0 15px #ffff00; }
+            0% {
+                opacity: 0.3;
+                background: #ff6600;
+                box-shadow: 0 0 5px #ff6600;
+            }
+
+            100% {
+                opacity: 1;
+                background: #ffff00;
+                box-shadow: 0 0 15px #ffff00;
+            }
         }
     </style>
 </head>
+
 <body>
 
     <div id="flash-overlay"></div>
@@ -220,13 +565,13 @@
                 <span id="current-count">9</span> / <span id="max-count">20</span>
             </div>
             <textarea id="names">짱구
-                짱아
-                신봉선
-                신영만
-                훈이
-                맹구
-                유리
-                철수
+짱아
+신봉선
+신영만
+훈이
+맹구
+유리
+철수
 </textarea><br>
             <button id="startBtn">⚡ RACE START ⚡</button>
         </div>
@@ -243,10 +588,12 @@
 
         <div id="sound-toggle" title="사운드 켜기/끄기">
             <svg id="sound-on-icon" viewBox="0 0 24 24">
-                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                <path
+                    d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
             </svg>
             <svg id="sound-off-icon" viewBox="0 0 24 24" style="display:none;">
-                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                <path
+                    d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
             </svg>
         </div>
     </div>
@@ -254,16 +601,17 @@
     <script type="module" src="/src/main.js"></script>
     <script>
         // 전체 페이지 드래그 드롭 방지 (input, textarea 제외)
-        document.addEventListener('dragover', function(e) {
+        document.addEventListener('dragover', function (e) {
             if (!e.target.matches('input, textarea')) {
                 e.preventDefault();
             }
         });
-        document.addEventListener('drop', function(e) {
+        document.addEventListener('drop', function (e) {
             if (!e.target.matches('input, textarea')) {
                 e.preventDefault();
             }
         });
     </script>
 </body>
+
 </html>
