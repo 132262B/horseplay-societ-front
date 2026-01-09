@@ -3,7 +3,7 @@
 set -e
 
 # 설정
-S3_BUCKET="horse-game-bucket"
+S3_BUCKET="horseplay-society"
 AWS_REGION="ap-northeast-2"
 BUILD_DIR="dist"
 
