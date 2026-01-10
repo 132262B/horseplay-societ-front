@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { SkillType, SkillConfig, triggerRandomSkill, calculateSkillSpeed } from './skills.js';
 import { updateMotion, resetMotion } from './motion.js';
-import { playThunder, playFirework, playCountSound, playHoofSound, playBoostSound, playRockBreakSound, playRockLandSound, playTeleportSound, toggleMute } from './sound.js';
+import { playThunder, playFirework, playCountSound, playHoofSound, playBoostSound, playRockBreakSound, playRockLandSound, playTeleportSound, startRainSound, stopRainSound, toggleMute } from './sound.js';
 import { initEffects, updateBoostEffects, emitBoostFlame, updateDustEffects, emitRunningDust } from './effects.js';
 import { MapEventType, mapEventManager } from './mapEvents.js';
 import {
@@ -23,6 +23,21 @@ const CAMERA_COOLDOWN = 120; // 카메라 변경 쿨다운 (약 2초)
 let cameraTarget = new THREE.Vector3(0, 10, -100); // 카메라가 바라보는 위치 (lerp용)
 let raceStartFrame = 0; // 레이스 시작 프레임
 const SKILL_DELAY = 180; // 스킬 사용 가능까지 딜레이 (3초 = 180프레임)
+
+// --- 비 이벤트 상태 ---
+let isRaining = false;
+let rainTimer = 0;
+let rainSpeedMultiplier = 1.0;
+let rainParticles = [];
+let originalFogColor = null;
+let originalAmbientIntensity = null;
+let originalDirLightIntensity = null;
+let rainLightningTimer = 0; // 번개 타이머
+let rainLightningCount = 0; // 남은 번개 횟수
+let rainLightningInterval = 600; // 번개 간격
+let rainFadeIn = false; // 어두워지는 중
+let rainFadeOut = false; // 밝아지는 중
+const RAIN_FADE_SPEED = 0.01; // 페이드 속도
 
 const colors = [
   0xff6b6b, // 연한 빨강
@@ -520,6 +535,236 @@ function executeTeleportEvent(config) {
   }, config.teleportDelay || 500);
 }
 
+// --- 비 이벤트 ---
+function executeRainEvent(config) {
+  addLog(config.message);
+
+  isRaining = true;
+  rainTimer = config.duration || 1800; // 30초
+  rainSpeedMultiplier = config.speedMultiplier || 0.5;
+
+  // 번개 설정
+  rainLightningInterval = config.lightningInterval || 600; // 10초마다
+  rainLightningCount = config.lightningCount || 3; // 총 3번
+  rainLightningTimer = rainLightningInterval; // 첫 번개는 10초 후
+
+  // 원본 조명 값 저장
+  originalFogColor = scene.fog.color.getHex();
+  originalAmbientIntensity = scene.children.find(c => c.isAmbientLight)?.intensity || 0.6;
+  originalDirLightIntensity = dirLight.intensity;
+
+  // 서서히 어두워지기 시작
+  rainFadeIn = true;
+  rainFadeOut = false;
+
+  // 비 소리 시작
+  startRainSound();
+
+  // 비 파티클 생성
+  createRainParticles();
+}
+
+function createRainParticles() {
+  // 선두 말 위치 기준
+  const leader = horses.filter(h => !h.finished)[0];
+  const centerZ = leader ? leader.mesh.position.z : -500;
+
+  // 비 라인 생성 (더 현실적인 빗줄기)
+  const rainCount = 1500;
+  
+  for (let i = 0; i < rainCount; i++) {
+    const length = 15 + Math.random() * 25; // 빗줄기 길이
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array([
+      0, 0, 0,
+      0, -length, 0
+    ]);
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const mat = new THREE.LineBasicMaterial({
+      color: 0xaaccff,
+      transparent: true,
+      opacity: 0.4 + Math.random() * 0.3,
+    });
+
+    const rainDrop = new THREE.Line(geo, mat);
+    rainDrop.position.set(
+      (Math.random() - 0.5) * 600,
+      Math.random() * 350,
+      centerZ + (Math.random() - 0.5) * 1200
+    );
+    rainDrop.userData.velocity = 12 + Math.random() * 8;
+    rainDrop.userData.isRainDrop = true;
+
+    scene.add(rainDrop);
+    rainParticles.push(rainDrop);
+  }
+}
+
+function updateRainEffect() {
+  if (!isRaining && !rainFadeOut) return;
+
+  // 서서히 어두워지기
+  if (rainFadeIn) {
+    const ambientLight = scene.children.find(c => c.isAmbientLight);
+    const targetAmbient = 0.3;
+    const targetDirLight = 0.5;
+    
+    if (ambientLight && ambientLight.intensity > targetAmbient) {
+      ambientLight.intensity -= RAIN_FADE_SPEED;
+    }
+    if (dirLight.intensity > targetDirLight) {
+      dirLight.intensity -= RAIN_FADE_SPEED;
+    }
+    
+    // 안개 색상 서서히 변경
+    const currentFog = scene.fog.color;
+    currentFog.r = Math.max(currentFog.r - RAIN_FADE_SPEED * 0.5, 0x44 / 255);
+    currentFog.g = Math.max(currentFog.g - RAIN_FADE_SPEED * 0.5, 0x55 / 255);
+    currentFog.b = Math.max(currentFog.b - RAIN_FADE_SPEED * 0.3, 0x66 / 255);
+    
+    // 페이드인 완료 체크
+    if (ambientLight && ambientLight.intensity <= targetAmbient && dirLight.intensity <= targetDirLight) {
+      rainFadeIn = false;
+    }
+  }
+
+  // 서서히 밝아지기
+  if (rainFadeOut) {
+    const ambientLight = scene.children.find(c => c.isAmbientLight);
+    const targetAmbient = originalAmbientIntensity || 0.6;
+    const targetDirLight = originalDirLightIntensity || 1.2;
+    
+    if (ambientLight && ambientLight.intensity < targetAmbient) {
+      ambientLight.intensity += RAIN_FADE_SPEED;
+    }
+    if (dirLight.intensity < targetDirLight) {
+      dirLight.intensity += RAIN_FADE_SPEED;
+    }
+    
+    // 안개 색상 서서히 복원
+    const currentFog = scene.fog.color;
+    const origR = ((originalFogColor || 0x87ceeb) >> 16 & 255) / 255;
+    const origG = ((originalFogColor || 0x87ceeb) >> 8 & 255) / 255;
+    const origB = (originalFogColor || 0x87ceeb) & 255 / 255;
+    currentFog.r = Math.min(currentFog.r + RAIN_FADE_SPEED * 0.5, origR);
+    currentFog.g = Math.min(currentFog.g + RAIN_FADE_SPEED * 0.5, origG);
+    currentFog.b = Math.min(currentFog.b + RAIN_FADE_SPEED * 0.3, origB);
+    
+    // 페이드아웃 완료 체크
+    if (ambientLight && ambientLight.intensity >= targetAmbient && dirLight.intensity >= targetDirLight) {
+      rainFadeOut = false;
+      // 원래 색상으로 완전 복원
+      scene.fog.color.setHex(originalFogColor || 0x87ceeb);
+    }
+    
+    return; // 페이드아웃 중에는 다른 로직 실행 안함
+  }
+
+  if (!isRaining) return;
+
+  rainTimer--;
+
+  // 선두 말 위치 기준
+  const activeHorses = horses.filter(h => !h.finished);
+  const sortedHorses = [...activeHorses].sort((a, b) => 
+    a.isReversed ? b.mesh.position.z - a.mesh.position.z : a.mesh.position.z - b.mesh.position.z
+  );
+  const leader = sortedHorses[0];
+  const centerZ = leader ? leader.mesh.position.z : 0;
+
+  // 빗줄기 업데이트
+  rainParticles.forEach(rainDrop => {
+    if (!rainDrop.userData.isRainDrop) return;
+
+    rainDrop.position.y -= rainDrop.userData.velocity;
+
+    // 바닥에 닿으면 다시 위로
+    if (rainDrop.position.y < -10) {
+      rainDrop.position.set(
+        (Math.random() - 0.5) * 600,
+        300 + Math.random() * 100,
+        centerZ + (Math.random() - 0.5) * 1200
+      );
+    }
+  });
+
+  // 번개 발생 (10초마다)
+  if (rainLightningCount > 0) {
+    rainLightningTimer--;
+    if (rainLightningTimer <= 0) {
+      // 1~3등 중 랜덤 타겟 선택
+      const topHorses = sortedHorses.slice(0, Math.min(3, sortedHorses.length));
+      if (topHorses.length > 0) {
+        const target = topHorses[Math.floor(Math.random() * topHorses.length)];
+        
+        // 노란빛 플래시
+        const flash = document.getElementById('flash-overlay');
+        flash.style.background = 'rgba(255, 255, 0, 0.8)';
+        flash.style.opacity = 1;
+        setTimeout(() => {
+          flash.style.opacity = 0;
+          setTimeout(() => {
+            flash.style.background = 'rgba(255, 255, 255, 0.9)';
+          }, 300);
+        }, 150);
+
+        // 번개 이펙트 및 효과
+        createLightningBolt(target.mesh.position.clone());
+        target.applyLightningStrike();
+        playThunder();
+
+        addLog(`⚡ ${target.name}에게 번개가 떨어졌습니다!`);
+      }
+
+      rainLightningCount--;
+      rainLightningTimer = rainLightningInterval; // 다음 번개 타이머 리셋
+    }
+  }
+
+  // 비 종료
+  if (rainTimer <= 0) {
+    stopRainEffect();
+  }
+}
+
+function stopRainEffect() {
+  isRaining = false;
+  rainSpeedMultiplier = 1.0;
+  rainFadeIn = false;
+  rainFadeOut = true; // 서서히 밝아지기 시작
+
+  // 비 소리 중지
+  stopRainSound();
+
+  // 비 파티클 제거
+  rainParticles.forEach(rain => {
+    scene.remove(rain);
+    rain.geometry.dispose();
+    rain.material.dispose();
+  });
+  rainParticles = [];
+
+  addLog('☀️ 비가 그쳤습니다!');
+}
+
+function clearRainEffect() {
+  isRaining = false;
+  rainTimer = 0;
+  rainSpeedMultiplier = 1.0;
+  rainLightningTimer = 0;
+  rainLightningCount = 0;
+  rainFadeIn = false;
+  rainFadeOut = false;
+  stopRainSound();
+  rainParticles.forEach(rain => {
+    scene.remove(rain);
+    rain.geometry.dispose();
+    rain.material.dispose();
+  });
+  rainParticles = [];
+}
+
 /**
  * 장애물 부서지는 이펙트
  */
@@ -729,6 +974,7 @@ function checkMapEvents() {
       [MapEventType.REVERSE_GOAL]: executeReverseGoalEvent,
       [MapEventType.OBSTACLE]: executeObstacleEvent,
       [MapEventType.TELEPORT]: executeTeleportEvent,
+      [MapEventType.RAIN]: executeRainEvent,
     });
   }
 }
@@ -993,6 +1239,11 @@ class Horse3D {
 
     // 스킬에 따른 속도 계산 (모듈 사용)
     let currentSpeed = calculateSkillSpeed(this.status, this.speed);
+
+    // 비 이벤트 시 속도 감소 (모든 스킬에 적용)
+    if (isRaining) {
+      currentSpeed *= rainSpeedMultiplier;
+    }
 
     // 부스트 중이면 불꽃 이펙트 발생
     if (this.status === SkillType.BOOST && frameCount % 2 === 0) {
@@ -1338,6 +1589,7 @@ function animate() {
   updateDustEffects();
   updateObstacles();
   updateTeleportEffects();
+  updateRainEffect();
   updateSpectators(isRacing, frameCount);
 
   if (isRacing) {
@@ -1527,6 +1779,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
     setFinishLineZ(getOriginalFinishZ()); // 결승선 위치 리셋
     mapEventManager.reset(); // 맵 이벤트 리셋
     clearObstacles(); // 장애물 정리
+    clearRainEffect(); // 비 이펙트 정리
     addLog(`📢 ${names.length}명 출발! 중간 지점에서 이벤트가 발생합니다!`);
   });
 });

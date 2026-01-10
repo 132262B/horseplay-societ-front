@@ -415,3 +415,76 @@ export function playRouletteResultSound() {
     }, i * 100);
   });
 }
+
+/**
+ * 비 소리 (지속적인 루프)
+ */
+let rainNoiseSource = null;
+let rainGainNode = null;
+
+export function startRainSound() {
+  if (isMuted) return;
+  if (rainNoiseSource) return; // 이미 재생 중
+
+  const ctx = getAudioContext();
+  if (ctx.state === 'suspended') ctx.resume();
+
+  // 비 소리용 노이즈 버퍼 생성 (2초 루프)
+  const bufferSize = ctx.sampleRate * 2;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+
+  for (let i = 0; i < bufferSize; i++) {
+    // 부드러운 노이즈
+    data[i] = (Math.random() * 2 - 1) * 0.5;
+  }
+
+  rainNoiseSource = ctx.createBufferSource();
+  rainNoiseSource.buffer = buffer;
+  rainNoiseSource.loop = true;
+
+  // 밴드패스 필터로 비 소리 느낌
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 3000;
+  filter.Q.value = 0.5;
+
+  // 하이패스 필터로 저음 제거
+  const highpass = ctx.createBiquadFilter();
+  highpass.type = 'highpass';
+  highpass.frequency.value = 500;
+
+  rainGainNode = ctx.createGain();
+  rainGainNode.gain.setValueAtTime(0, ctx.currentTime);
+  rainGainNode.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 1); // 페이드인
+
+  rainNoiseSource.connect(filter);
+  filter.connect(highpass);
+  highpass.connect(rainGainNode);
+  rainGainNode.connect(ctx.destination);
+
+  rainNoiseSource.start();
+}
+
+export function stopRainSound() {
+  if (!rainNoiseSource) return;
+
+  const ctx = getAudioContext();
+
+  // 페이드 아웃
+  if (rainGainNode) {
+    rainGainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
+  }
+
+  setTimeout(() => {
+    if (rainNoiseSource) {
+      rainNoiseSource.stop();
+      rainNoiseSource.disconnect();
+      rainNoiseSource = null;
+    }
+    if (rainGainNode) {
+      rainGainNode.disconnect();
+      rainGainNode = null;
+    }
+  }, 600);
+}
