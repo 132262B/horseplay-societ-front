@@ -1521,6 +1521,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
 
   startCountdown(() => {
     document.getElementById('broadcast').style.display = 'block';
+    document.getElementById('rank-live').style.display = 'block';
     isRacing = true;
     raceStartFrame = frameCount; // 스킬 딜레이 계산용
     setFinishLineZ(getOriginalFinishZ()); // 결승선 위치 리셋
