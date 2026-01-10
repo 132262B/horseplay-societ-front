@@ -3,12 +3,37 @@
  */
 let audioCtx = null;
 let isMuted = false;
+let isAudioUnlocked = false;
 
 function getAudioContext() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   return audioCtx;
+}
+
+/**
+ * iOS Safari 등에서 오디오 unlock (첫 사용자 상호작용 시 호출)
+ */
+export function unlockAudio() {
+  if (isAudioUnlocked) return;
+  
+  const ctx = getAudioContext();
+  
+  // suspended 상태면 resume
+  if (ctx.state === 'suspended') {
+    ctx.resume();
+  }
+  
+  // 무음 버퍼 재생하여 완전히 unlock
+  const buffer = ctx.createBuffer(1, 1, 22050);
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.start(0);
+  
+  isAudioUnlocked = true;
+  console.log('Audio unlocked for iOS Safari');
 }
 
 /**

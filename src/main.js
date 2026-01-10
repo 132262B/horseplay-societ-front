@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { SkillType, SkillConfig, triggerRandomSkill, calculateSkillSpeed } from './skills.js';
 import { updateMotion, resetMotion } from './motion.js';
-import { playThunder, playFirework, playCountSound, playHoofSound, playBoostSound, playRockBreakSound, playRockLandSound, playTeleportSound, startRainSound, stopRainSound, toggleMute } from './sound.js';
+import { playThunder, playFirework, playCountSound, playHoofSound, playBoostSound, playRockBreakSound, playRockLandSound, playTeleportSound, startRainSound, stopRainSound, toggleMute, unlockAudio } from './sound.js';
 import { initEffects, updateBoostEffects, emitBoostFlame, updateDustEffects, emitRunningDust } from './effects.js';
 import { MapEventType, mapEventManager } from './mapEvents.js';
 import {
@@ -1736,6 +1736,9 @@ if (queryNames) {
 updateParticipantCount();
 
 document.getElementById('startBtn').addEventListener('click', () => {
+  // iOS Safari 오디오 unlock
+  unlockAudio();
+  
   const input = document.getElementById('names').value;
   let names = input
     .split('\n')
