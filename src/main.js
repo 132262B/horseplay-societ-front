@@ -1528,4 +1528,51 @@ document.getElementById('sound-toggle').addEventListener('click', () => {
   document.getElementById('sound-off-icon').style.display = muted ? 'block' : 'none';
 });
 
+// 공유 버튼
+document.getElementById('shareBtn').addEventListener('click', () => {
+  const input = document.getElementById('names').value;
+  const names = input
+    .split('\n')
+    .map((n) => n.trim())
+    .filter((n) => n);
+
+  if (names.length < 2) {
+    showToast('최소 2명의 참가자가 필요합니다', '#ff6b6b');
+    return;
+  }
+
+  // || 로 이름 연결 후 base64 인코딩 (한글 지원)
+  const joined = names.join('||');
+  const encoded = btoa(
+    encodeURIComponent(joined)
+      .replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16)))
+  );
+
+  // URL 생성
+  const url = `${window.location.origin}${window.location.pathname}?query=${encoded}`;
+
+  // 클립보드 복사
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('🔗 URL이 복사되었습니다!', '#4caf50');
+  }).catch(() => {
+    showToast('복사 실패. 다시 시도해주세요.', '#ff6b6b');
+  });
+});
+
+// 토스트 메시지 표시
+function showToast(message, color = '#4caf50') {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.style.color = color;
+  toast.style.borderColor = color;
+  toast.style.display = 'block';
+  toast.style.animation = 'none';
+  toast.offsetHeight; // reflow
+  toast.style.animation = 'toastFadeIn 0.3s ease-out';
+
+  setTimeout(() => {
+    toast.style.display = 'none';
+  }, 2000);
+}
+
 init();

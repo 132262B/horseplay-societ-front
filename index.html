@@ -511,6 +511,17 @@
                 box-shadow: 0 0 15px #ffff00;
             }
         }
+
+        @keyframes toastFadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
     </style>
 </head>
 
@@ -566,14 +577,17 @@
             </div>
             <textarea id="names">짱구
 짱아
-신봉선
-신영만
+봉미선
+신형만
 훈이
 맹구
 유리
 철수
 </textarea><br>
-            <button id="startBtn">⚡ RACE START ⚡</button>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="startBtn">게임 시작</button>
+                <button id="shareBtn" style="background: #444; padding: 15px 20px;">공유하기</button>
+            </div>
         </div>
 
         <div id="broadcast">
@@ -585,6 +599,24 @@
             <ul id="rank-list" style="padding:0"></ul>
             <button onclick="location.reload()">다시 하기</button>
         </div>
+
+        <!-- 토스트 메시지 -->
+        <div id="toast" style="
+            display: none;
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: #4caf50;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            border: 1px solid #4caf50;
+            z-index: 1000;
+            pointer-events: none;
+            animation: toastFadeIn 0.3s ease-out;
+        "></div>
 
         <div id="sound-toggle" title="사운드 켜기/끄기">
             <svg id="sound-on-icon" viewBox="0 0 24 24">
