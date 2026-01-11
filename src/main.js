@@ -1704,11 +1704,14 @@ namesTextarea.addEventListener('input', (e) => {
 // URL 쿼리 파라미터에서 말 이름 가져오기
 function getHorseNamesFromQuery() {
   const params = new URLSearchParams(window.location.search);
-  const queryData = params.get('query');
+  let queryData = params.get('query');
 
   if (!queryData) return null;
 
   try {
+    // URL에서 +가 공백으로 변환되므로 다시 +로 복원
+    queryData = queryData.replace(/ /g, '+');
+
     // base64 디코딩 (한글 지원을 위해 decodeURIComponent + atob 사용)
     const decoded = decodeURIComponent(
       atob(queryData)
