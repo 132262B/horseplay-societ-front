@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { SkillType, SkillConfig, triggerRandomSkill, calculateSkillSpeed } from './skills.js';
 import { updateMotion, resetMotion } from './motion.js';
-import { playThunder, playFirework, playCountSound, playHoofSound, playBoostSound, playRockBreakSound, playRockLandSound, playTeleportSound, startRainSound, stopRainSound, toggleMute, unlockAudio } from './sound.js';
+import { playThunder, playFirework, playCountSound, playHoofSound, playBoostSound, playRockBreakSound, playRockLandSound, playTeleportSound, startRainSound, stopRainSound, toggleMute, unlockAudio, playBGM, setBGMMuted } from './sound.js';
 import { initEffects, updateBoostEffects, emitBoostFlame, updateDustEffects, emitRunningDust } from './effects.js';
 import { MapEventType, mapEventManager } from './mapEvents.js';
 import {
@@ -1735,10 +1735,13 @@ if (queryNames) {
 }
 updateParticipantCount();
 
-document.getElementById('startBtn').addEventListener('click', () => {
-  // iOS Safari 오디오 unlock
-  unlockAudio();
-  
+document.getElementById('startBtn').addEventListener('click', async () => {
+  // iOS Safari 오디오 unlock (await로 확실히 대기)
+  await unlockAudio();
+
+  // BGM 재생
+  playBGM();
+
   const input = document.getElementById('names').value;
   let names = input
     .split('\n')
@@ -1792,6 +1795,8 @@ document.getElementById('sound-toggle').addEventListener('click', () => {
   const muted = toggleMute();
   document.getElementById('sound-on-icon').style.display = muted ? 'none' : 'block';
   document.getElementById('sound-off-icon').style.display = muted ? 'block' : 'none';
+  // BGM도 음소거 상태에 맞춰 제어
+  setBGMMuted(muted);
 });
 
 // 공유 버튼

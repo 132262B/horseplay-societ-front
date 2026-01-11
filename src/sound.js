@@ -15,25 +15,42 @@ function getAudioContext() {
 /**
  * iOS Safari 등에서 오디오 unlock (첫 사용자 상호작용 시 호출)
  */
-export function unlockAudio() {
+export async function unlockAudio() {
   if (isAudioUnlocked) return;
-  
+
   const ctx = getAudioContext();
-  
-  // suspended 상태면 resume
+
+  // suspended 상태면 resume (await로 확실히 대기)
   if (ctx.state === 'suspended') {
-    ctx.resume();
+    try {
+      await ctx.resume();
+    } catch (e) {
+      console.warn('AudioContext resume failed:', e);
+    }
   }
-  
+
   // 무음 버퍼 재생하여 완전히 unlock
   const buffer = ctx.createBuffer(1, 1, 22050);
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   source.connect(ctx.destination);
   source.start(0);
-  
+
+  // iOS Safari를 위한 추가 unlock 시도 - 짧은 oscillator 재생
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.value = 0.001; // 거의 들리지 않는 볼륨
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(0);
+    osc.stop(ctx.currentTime + 0.001);
+  } catch (e) {
+    // 무시
+  }
+
   isAudioUnlocked = true;
-  console.log('Audio unlocked for iOS Safari');
+  console.log('Audio unlocked for iOS Safari, state:', ctx.state);
 }
 
 /**
@@ -512,4 +529,41 @@ export function stopRainSound() {
       rainGainNode = null;
     }
   }, 600);
+}
+
+/**
+ * BGM 관련
+ */
+let bgmAudio = null;
+
+export function playBGM() {
+  if (bgmAudio) return; // 이미 재생 중
+
+  bgmAudio = new Audio('/bgm.mp3');
+  bgmAudio.loop = true;
+  bgmAudio.volume = 0.3;
+
+  if (!isMuted) {
+    bgmAudio.play().catch(e => {
+      console.warn('BGM 재생 실패:', e);
+    });
+  }
+}
+
+export function stopBGM() {
+  if (!bgmAudio) return;
+
+  bgmAudio.pause();
+  bgmAudio.currentTime = 0;
+  bgmAudio = null;
+}
+
+export function setBGMMuted(muted) {
+  if (!bgmAudio) return;
+
+  if (muted) {
+    bgmAudio.pause();
+  } else {
+    bgmAudio.play().catch(() => {});
+  }
 }
