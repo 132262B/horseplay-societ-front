@@ -121,7 +121,28 @@
             border-radius: 20px;
             text-align: center;
             min-width: 300px;
+            max-height: 80vh;
             z-index: 20;
+        }
+
+        #rank-list {
+            max-height: 50vh;
+            overflow-y: auto;
+            margin: 0;
+        }
+
+        #rank-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #rank-list::-webkit-scrollbar-track {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        #rank-list::-webkit-scrollbar-thumb {
+            background: gold;
+            border-radius: 4px;
         }
 
         /* 기본값: 모바일/태블릿 (1280px 미만) */
@@ -139,7 +160,7 @@
             border-radius: 6px;
             border: 1px solid #555;
             min-width: 70px;
-            max-height: 150px;
+            max-height: 240px;
             overflow: hidden;
         }
 
@@ -204,7 +225,7 @@
                 padding: 15px 20px;
                 border-radius: 10px;
                 min-width: 180px;
-                max-height: 350px;
+                max-height: 360px;
             }
 
             #rank-live h3 {

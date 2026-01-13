@@ -14,6 +14,7 @@ import { initSpectators, createSpectators, updateSpectators } from './map/specta
 let scene, camera, renderer, dirLight;
 let horses = [];
 let isRacing = false;
+let isFastForward = false; // 빨리감기 모드 (1,2등 결정 후)
 
 let frameCount = 0;
 let finishedCount = 0;
@@ -965,8 +966,9 @@ function updateObstacles() {
   }
 }
 
-// 맵 이벤트 체크 및 실행 (절반 지점에서 1회만)
+// 맵 이벤트 체크 및 실행 (절반 지점에서 1회만, 빨리감기 시 비활성)
 function checkMapEvents() {
+  if (isFastForward) return; // 빨리감기 모드에서는 맵 이벤트 없음
   if (mapEventManager.checkHalfwayReached(horses, getOriginalFinishZ())) {
     // 랜덤으로 이벤트 1개 선택하여 실행
     mapEventManager.triggerRandomEvent({
@@ -1245,6 +1247,15 @@ class Horse3D {
       currentSpeed *= rainSpeedMultiplier;
     }
 
+    // 빨리감기 모드: 속도 5배 증가 + 상태이상 무시
+    if (isFastForward) {
+      currentSpeed = this.baseSpeed * 5;
+      // 상태이상 즉시 해제
+      if (this.status !== SkillType.RUN) {
+        this.resetStatus();
+      }
+    }
+
     // 부스트 중이면 불꽃 이펙트 발생
     if (this.status === SkillType.BOOST && frameCount % 2 === 0) {
       emitBoostFlame(this);
@@ -1280,9 +1291,9 @@ class Horse3D {
     // 스킬 쿨다운 감소 (RUN 상태일 때만)
     if (this.skillCooldown > 0 && this.status === SkillType.RUN) this.skillCooldown--;
 
-    // 랜덤 스킬 발동 (3초 후부터 가능, 쿨다운 체크)
+    // 랜덤 스킬 발동 (3초 후부터 가능, 쿨다운 체크, 빨리감기 시 비활성)
     const skillAvailable = frameCount - raceStartFrame >= SKILL_DELAY;
-    const canUseSkill = this.status === SkillType.RUN && skillAvailable && this.skillCooldown <= 0;
+    const canUseSkill = this.status === SkillType.RUN && skillAvailable && this.skillCooldown <= 0 && !isFastForward;
 
     if (canUseSkill && Math.random() < 0.0015) {
       // WALK 스킬 발동 (미사용 시 10% 확률)
@@ -1317,7 +1328,13 @@ class Horse3D {
     if (reachedFinish) {
       this.finished = true;
       finishedCount++;
-      addLog(`🏁 ${this.name} 골인!!!`);
+
+      // 빨리감기 모드에서는 순위와 함께 간단히 표시
+      if (isFastForward) {
+        addLog(`${finishedCount}등: ${this.name}`);
+      } else {
+        addLog(`🏁 ${this.name} 골인!!!`);
+      }
       addToRank(this.name);
 
       if (finishedCount === 1) {
@@ -1325,12 +1342,24 @@ class Horse3D {
         addLog(`🎉🎉🎉 ${this.name} 우승!!! 🎉🎉🎉`);
       }
 
-      if (finishedCount >= 2) {
+      // 2등까지 결정되면 빨리감기 모드 시작
+      if (finishedCount === 2 && !isFastForward) {
+        isFastForward = true;
+        // 진행 중인 효과들 정리
+        if (isRaining) stopRainEffect();
+        clearObstacles();
+        addLog('⏩ 빨리감기! 나머지 순위를 결정합니다...');
+      }
+
+      // 모든 말 골인 시 경기 종료
+      if (finishedCount >= horses.length) {
         isRacing = false;
+        isFastForward = false;
         setTimeout(() => {
-          addLog('🏆 경기 종료! 1, 2등이 결정되었습니다!');
+          addLog('🏆 경기 종료! 전체 순위가 결정되었습니다!');
+          document.getElementById('rank-live').style.display = 'none'; // 실시간 순위 숨기기
           document.getElementById('rank-board').style.display = 'block';
-        }, 1500);
+        }, 500);
       }
     }
   }
@@ -1784,6 +1813,7 @@ document.getElementById('startBtn').addEventListener('click', async () => {
     document.getElementById('broadcast').style.display = 'block';
     document.getElementById('rank-live').style.display = 'block';
     isRacing = true;
+    isFastForward = false; // 빨리감기 모드 리셋
     raceStartFrame = frameCount; // 스킬 딜레이 계산용
     setFinishLineZ(getOriginalFinishZ()); // 결승선 위치 리셋
     mapEventManager.reset(); // 맵 이벤트 리셋
