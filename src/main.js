@@ -1832,6 +1832,26 @@ document.getElementById('sound-toggle').addEventListener('click', () => {
   setBGMMuted(muted);
 });
 
+// 섞기 버튼
+document.getElementById('shuffleBtn').addEventListener('click', () => {
+  const textarea = document.getElementById('names');
+  const names = textarea.value
+    .split('\n')
+    .map(n => n.trim())
+    .filter(n => n);
+
+  if (names.length < 2) return;
+
+  // Fisher-Yates 알고리즘으로 섞기
+  for (let i = names.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [names[i], names[j]] = [names[j], names[i]];
+  }
+
+  textarea.value = names.join('\n');
+  updateParticipantCount();
+});
+
 // 공유 버튼
 document.getElementById('shareBtn').addEventListener('click', () => {
   const input = document.getElementById('names').value;
