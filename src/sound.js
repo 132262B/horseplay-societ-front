@@ -4,6 +4,7 @@
 let audioCtx = null;
 let isMuted = false;
 let isAudioUnlocked = false;
+let masterVolume = 1.0; // 마스터 볼륨 (0~1)
 
 function getAudioContext() {
   if (!audioCtx) {
@@ -66,6 +67,26 @@ export function getIsMuted() {
 export function toggleMute() {
   isMuted = !isMuted;
   return isMuted;
+}
+
+/**
+ * 마스터 볼륨 설정
+ * @param {number} volume - 볼륨 (0~1)
+ */
+export function setMasterVolume(volume) {
+  masterVolume = Math.max(0, Math.min(1, volume));
+  // BGM 볼륨도 조절
+  if (bgmAudio) {
+    bgmAudio.volume = 0.3 * masterVolume;
+  }
+  return masterVolume;
+}
+
+/**
+ * 마스터 볼륨 가져오기
+ */
+export function getMasterVolume() {
+  return masterVolume;
 }
 
 /**

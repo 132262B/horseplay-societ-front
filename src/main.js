@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { SkillType, SkillConfig, triggerRandomSkill, calculateSkillSpeed } from './skills.js';
 import { updateMotion, resetMotion } from './motion.js';
-import { playThunder, playFirework, playCountSound, playHoofSound, playBoostSound, playRockBreakSound, playRockLandSound, playTeleportSound, startRainSound, stopRainSound, toggleMute, unlockAudio, playBGM, setBGMMuted } from './sound.js';
+import { playThunder, playFirework, playCountSound, playHoofSound, playBoostSound, playRockBreakSound, playRockLandSound, playTeleportSound, startRainSound, stopRainSound, toggleMute, unlockAudio, playBGM, setBGMMuted, setMasterVolume } from './sound.js';
 import { initEffects, updateBoostEffects, emitBoostFlame, updateDustEffects, emitRunningDust } from './effects.js';
 import { MapEventType, mapEventManager } from './mapEvents.js';
 import {
@@ -1831,6 +1831,36 @@ document.getElementById('sound-toggle').addEventListener('click', () => {
   // BGM도 음소거 상태에 맞춰 제어
   setBGMMuted(muted);
 });
+
+// 볼륨 슬라이더
+const volumeSlider = document.getElementById('volume-slider');
+const volumeValue = document.getElementById('volume-value');
+
+function updateVolumeSliderBackground(value) {
+  const percentage = value;
+  volumeSlider.style.background = `linear-gradient(to right, #4caf50 0%, #4caf50 ${percentage}%, #555 ${percentage}%)`;
+}
+
+volumeSlider.addEventListener('input', (e) => {
+  const value = parseInt(e.target.value);
+  volumeValue.textContent = `${value}%`;
+  setMasterVolume(value / 100);
+  updateVolumeSliderBackground(value);
+
+  // 볼륨 0이면 음소거 아이콘, 아니면 소리 아이콘
+  const soundOnIcon = document.getElementById('sound-on-icon');
+  const soundOffIcon = document.getElementById('sound-off-icon');
+  if (value === 0) {
+    soundOnIcon.style.display = 'none';
+    soundOffIcon.style.display = 'block';
+  } else {
+    soundOnIcon.style.display = 'block';
+    soundOffIcon.style.display = 'none';
+  }
+});
+
+// 초기 슬라이더 배경 설정
+updateVolumeSliderBackground(100);
 
 // 섞기 버튼
 document.getElementById('shuffleBtn').addEventListener('click', () => {
